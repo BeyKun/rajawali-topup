@@ -27,6 +27,14 @@ final class RecordingMidtransClient implements MidtransClient
         return (object) [];
     }
 
+    public function createSnapTransaction(array $payload): object
+    {
+        return (object) [
+            'token' => 'snap-token-' . ($payload['transaction_details']['order_id'] ?? 'test'),
+            'redirect_url' => 'https://app.sandbox.midtrans.com/snap/v4/redirection/snap-token-' . ($payload['transaction_details']['order_id'] ?? 'test'),
+        ];
+    }
+
     public function cancel(string $transactionId): void
     {
         $this->cancellations[] = $transactionId;

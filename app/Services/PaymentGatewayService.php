@@ -187,12 +187,97 @@ class PaymentGatewayService
     /**
      * Create a real QRIS charge through the Midtrans Core API.
      *
+    /**
+     * Create a Midtrans payment invoice (Snap or Core API based on driver setting).
+     *
      * @param  array{order_no: string, amount: float|int|string, customer_name?: string, msisdn?: string}  $params
      * @return array{qris_string: string|null, qris_url: string|null, transaction_id: string, expired_at: CarbonInterface}
      *
      * @throws RuntimeException When Midtrans rejects or is unreachable.
      */
     protected function createMidtransQrisInvoice(array $params): array
+    {
+        $driver = (string) config('payment.midtrans.driver', 'snap');
+
+        if ($driver === 'snap') {
+            return $this->createMidtransSnapInvoice($params);
+        }
+
+        return $this->createMidtransCoreInvoice($params);
+    }
+
+    /**
+     * Create a Snap checkout transaction returning redirect URL and token.
+     *
+     * @param  array{order_no: string, amount: float|int|string, customer_name?: string, msisdn?: string}  $params
+     * @return array{qris_string: string|null, qris_url: string|null, transaction_id: string, expired_at: CarbonInterface}
+     */
+    protected function createMidtransSnapInvoice(array $params): array
+    {
+        if ((string) config('payment.midtrans.server_key', '') === '') {
+            throw new RuntimeException('MIDTRANS_SERVER_KEY belum dikonfigurasi.');
+        }
+
+        $orderNo = $params['order_no'];
+        $amount = (int) round((float) $params['amount']);
+
+        $payload = [
+            'transaction_details' => [
+                'order_id' => $orderNo,
+                'gross_amount' => $amount,
+            ],
+            'customer_details' => [
+                'first_name' => $params['customer_name'] ?? 'Pelanggan',
+                'phone' => $params['msisdn'] ?? null,
+            ],
+            'enabled_payments' => (array) config('payment.midtrans.enabled_payments', ['gopay', 'qris', 'bni_va']),
+            'custom_field1' => $params['msisdn'] ?? null,
+        ];
+
+        try {
+            $response = $this->midtrans->createSnapTransaction($payload);
+        } catch (Throwable $exception) {
+            Log::error('Midtrans Snap transaction creation failed.', [
+                'order_no' => $orderNo,
+                'error' => $exception->getMessage(),
+            ]);
+
+            throw new RuntimeException(
+                'Gagal membuat transaksi pembayaran melalui Midtrans Snap: '.$exception->getMessage(),
+                previous: $exception,
+            );
+        }
+
+        /** @var array<string, mixed> $data */
+        $data = json_decode((string) json_encode($response), true) ?? [];
+
+        $token = (string) ($data['token'] ?? '');
+        $redirectUrl = (string) ($data['redirect_url'] ?? '');
+
+        if ($token === '' || $redirectUrl === '') {
+            Log::error('Midtrans Snap returned an unexpected response.', [
+                'order_no' => $orderNo,
+                'response' => $data,
+            ]);
+
+            throw new RuntimeException('Midtrans tidak mengembalikan token transaksi Snap yang valid.');
+        }
+
+        return [
+            'qris_string' => null,
+            'qris_url' => $redirectUrl,
+            'transaction_id' => $token,
+            'expired_at' => now()->addMinutes(self::INVOICE_TTL_MINUTES),
+        ];
+    }
+
+    /**
+     * Create a direct Core API QRIS / GoPay transaction.
+     *
+     * @param  array{order_no: string, amount: float|int|string, customer_name?: string, msisdn?: string}  $params
+     * @return array{qris_string: string|null, qris_url: string|null, transaction_id: string, expired_at: CarbonInterface}
+     */
+    protected function createMidtransCoreInvoice(array $params): array
     {
         if ((string) config('payment.midtrans.server_key', '') === '') {
             throw new RuntimeException('MIDTRANS_SERVER_KEY belum dikonfigurasi.');

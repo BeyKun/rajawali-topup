@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Contracts\MidtransClient;
 use Midtrans\Config as MidtransConfig;
 use Midtrans\CoreApi;
+use Midtrans\Snap;
 use Midtrans\Transaction;
 
 /**
@@ -20,6 +21,16 @@ class SdkMidtransClient implements MidtransClient
         $this->configure();
 
         return CoreApi::charge($payload);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function createSnapTransaction(array $payload): object
+    {
+        $this->configure();
+
+        return Snap::createTransaction($payload);
     }
 
     /**

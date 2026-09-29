@@ -19,6 +19,14 @@ interface MidtransClient
     public function charge(array $payload): object;
 
     /**
+     * Create a Midtrans Snap transaction (`/snap/v1/transactions`).
+     *
+     * @param  array<string, mixed>  $payload
+     * @return object The decoded Midtrans Snap response (contains token and redirect_url).
+     */
+    public function createSnapTransaction(array $payload): object;
+
+    /**
      * Cancel a pending Midtrans transaction (Core API `/v2/{id}/cancel`).
      *
      * Used when a customer abandons a QRIS payment so the pending charge does

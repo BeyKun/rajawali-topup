@@ -59,6 +59,9 @@ return [
         /** Merchant id shown in the Midtrans dashboard. */
         'merchant_id' => env('MIDTRANS_MERCHANT_ID'),
 
+        /** Midtrans integration driver: 'snap' (recommended for production) or 'core'. */
+        'driver' => env('MIDTRANS_DRIVER', 'snap'),
+
         /** Midtrans payment channel used for the topup orders. */
         'payment_type' => env('MIDTRANS_PAYMENT_TYPE', 'qris'),
 

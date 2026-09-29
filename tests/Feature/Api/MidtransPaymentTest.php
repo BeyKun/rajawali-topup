@@ -41,6 +41,20 @@ final class FakeMidtransClient implements MidtransClient
         return $this->response ?? (object) [];
     }
 
+    public function createSnapTransaction(array $payload): object
+    {
+        $this->charges[] = $payload;
+
+        if ($this->exception !== null) {
+            throw $this->exception;
+        }
+
+        return $this->response ?? (object) [
+            'token' => 'snap-token-' . ($payload['transaction_details']['order_id'] ?? 'test'),
+            'redirect_url' => 'https://app.sandbox.midtrans.com/snap/v4/redirection/snap-token-' . ($payload['transaction_details']['order_id'] ?? 'test'),
+        ];
+    }
+
     public function cancel(string $transactionId): void
     {
         $this->cancellations[] = $transactionId;
@@ -54,6 +68,7 @@ final class FakeMidtransClient implements MidtransClient
 beforeEach(function () {
     config([
         'payment.provider' => 'midtrans',
+        'payment.midtrans.driver' => 'core',
         'payment.midtrans.server_key' => 'SB-Mid-server-TESTKEY',
         'payment.midtrans.client_key' => 'SB-Mid-client-TESTKEY',
         'payment.midtrans.is_production' => false,
@@ -138,6 +153,33 @@ test('midtrans invoice creation supports gopay payment type without qris key', f
         ->and($charge['transaction_details']['gross_amount'])->toBe(15000)
         ->and(isset($charge['qris']))->toBeFalse()
         ->and($invoice['transaction_id'])->toBe('txn-RJW-20260924-0002');
+});
+
+test('midtrans snap driver creates snap transaction with token and redirect url', function () {
+    config()->set('payment.midtrans.driver', 'snap');
+
+    $this->fake->response = (object) [
+        'token' => 'snap-token-12345',
+        'redirect_url' => 'https://app.sandbox.midtrans.com/snap/v4/redirection/snap-token-12345',
+    ];
+
+    $invoice = app(PaymentGatewayService::class)->createQrisInvoice([
+        'order_no' => 'RJW-20260924-SNAP1',
+        'amount' => 50000,
+        'customer_name' => 'Budi Santoso',
+        'msisdn' => '6281234567890',
+    ]);
+
+    expect($this->fake->charges)->toHaveCount(1);
+
+    $charge = $this->fake->charges[0];
+
+    expect($charge['transaction_details']['order_id'])->toBe('RJW-20260924-SNAP1')
+        ->and($charge['transaction_details']['gross_amount'])->toBe(50000)
+        ->and($charge['customer_details']['phone'])->toBe('6281234567890')
+        ->and($invoice['transaction_id'])->toBe('snap-token-12345')
+        ->and($invoice['qris_url'])->toBe('https://app.sandbox.midtrans.com/snap/v4/redirection/snap-token-12345')
+        ->and($invoice['qris_string'])->toBeNull();
 });
 
 test('a gateway failure during checkout releases the reserved voucher', function () {
