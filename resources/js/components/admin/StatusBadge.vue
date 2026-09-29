@@ -21,6 +21,8 @@ const variantMap: Record<string, BadgeVariant> = {
     SUCCESS: 'default',
     ACTIVE: 'default',
     INACTIVE: 'outline',
+    CANCELED: 'destructive',
+    CANCELLED: 'destructive',
 };
 
 const classMap: Record<string, string> = {
@@ -32,6 +34,8 @@ const classMap: Record<string, string> = {
     RESERVED: 'bg-amber-500 text-white hover:bg-amber-500/90',
     PENDING: 'bg-amber-500 text-white hover:bg-amber-500/90',
     FAILED: 'bg-red-600 text-white hover:bg-red-600/90',
+    CANCELED: 'bg-red-600 text-white hover:bg-red-600/90',
+    CANCELLED: 'bg-red-600 text-white hover:bg-red-600/90',
     EXPIRED: 'text-muted-foreground',
     UNPAID: 'text-muted-foreground',
     ACTIVE: 'bg-emerald-600 text-white hover:bg-emerald-600/90',
@@ -39,8 +43,14 @@ const classMap: Record<string, string> = {
 
 const variant = computed<BadgeVariant>(() => variantMap[props.status] ?? 'outline');
 const extraClass = computed(() => classMap[props.status] ?? '');
+const displayLabel = computed(() => {
+    if (props.status === 'CANCELED' || props.status === 'CANCELLED') {
+        return 'Canceled';
+    }
+    return props.status;
+});
 </script>
 
 <template>
-    <Badge :variant="variant" :class="extraClass">{{ status }}</Badge>
+    <Badge :variant="variant" :class="extraClass">{{ displayLabel }}</Badge>
 </template>

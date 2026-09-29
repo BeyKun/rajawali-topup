@@ -170,8 +170,8 @@ class OrderController extends Controller
         }
 
         $order->update([
-            'payment_status' => PaymentStatus::Failed,
-            'redeem_status' => RedeemStatus::Failed,
+            'payment_status' => PaymentStatus::Canceled,
+            'redeem_status' => RedeemStatus::Canceled,
         ]);
 
         if ($order->voucher_id !== null) {

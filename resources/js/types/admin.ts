@@ -45,8 +45,8 @@ export type VoucherCheckResult = {
     status_message: string;
 };
 
-export type PaymentStatus = 'UNPAID' | 'PAID' | 'EXPIRED' | 'FAILED';
-export type RedeemStatus = 'PENDING' | 'PROCESSING' | 'SUCCESS' | 'FAILED';
+export type PaymentStatus = 'UNPAID' | 'PAID' | 'EXPIRED' | 'FAILED' | 'CANCELED';
+export type RedeemStatus = 'PENDING' | 'PROCESSING' | 'SUCCESS' | 'FAILED' | 'CANCELED';
 
 export type AdminProductRow = {
     id: number;

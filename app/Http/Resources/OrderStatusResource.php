@@ -62,7 +62,7 @@ class OrderStatusResource extends JsonResource
             };
         }
 
-        if ($this->payment_status === PaymentStatus::Expired) {
+        if ($this->payment_status === PaymentStatus::Canceled || $this->payment_status === PaymentStatus::Expired) {
             return 'Pesanan dibatalkan atau kedaluwarsa. Silakan buat pesanan baru.';
         }
 

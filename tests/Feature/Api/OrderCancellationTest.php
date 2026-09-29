@@ -85,10 +85,12 @@ test('a customer can cancel an unpaid order and the voucher returns to stock', f
         ->assertOk()
         ->assertJsonPath('success', true)
         ->assertJsonPath('data.order_no', $order->order_no)
-        ->assertJsonPath('data.payment_status', 'EXPIRED')
+        ->assertJsonPath('data.payment_status', 'CANCELED')
+        ->assertJsonPath('data.redeem_status', 'CANCELED')
         ->assertJsonPath('data.message', 'Pesanan dibatalkan atau kedaluwarsa. Silakan buat pesanan baru.');
 
-    expect($order->fresh()->payment_status)->toBe(PaymentStatus::Expired)
+    expect($order->fresh()->payment_status)->toBe(PaymentStatus::Canceled)
+        ->and($order->fresh()->redeem_status)->toBe(RedeemStatus::Canceled)
         ->and(Voucher::query()->find($voucherId)->status)->toBe(VoucherStatus::Available);
 
     expect($this->fake->cancellations)->toBe([$order->payment_ref_id]);
@@ -142,7 +144,7 @@ test('cancelling still succeeds locally when the gateway cancel fails', function
         ->assertOk()
         ->assertJsonPath('success', true);
 
-    expect($order->fresh()->payment_status)->toBe(PaymentStatus::Expired);
+    expect($order->fresh()->payment_status)->toBe(PaymentStatus::Canceled);
 });
 
 test('the service refuses to cancel an order that is not awaiting payment', function () {

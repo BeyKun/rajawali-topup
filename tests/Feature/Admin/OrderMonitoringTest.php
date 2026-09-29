@@ -138,8 +138,8 @@ test('cancelling an order marks it failed and releases the reserved voucher', fu
         ->post("/admin/orders/{$order->id}/cancel")
         ->assertRedirect();
 
-    expect($order->fresh()->payment_status)->toBe(PaymentStatus::Failed)
-        ->and($order->fresh()->redeem_status)->toBe(RedeemStatus::Failed)
+    expect($order->fresh()->payment_status)->toBe(PaymentStatus::Canceled)
+        ->and($order->fresh()->redeem_status)->toBe(RedeemStatus::Canceled)
         ->and($voucher->fresh()->status)->toBe(VoucherStatus::Available);
 });
 

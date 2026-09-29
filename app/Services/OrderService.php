@@ -133,7 +133,10 @@ class OrderService
                 return false;
             }
 
-            $locked->update(['payment_status' => PaymentStatus::Expired]);
+            $locked->update([
+                'payment_status' => PaymentStatus::Canceled,
+                'redeem_status' => RedeemStatus::Canceled,
+            ]);
 
             $this->releaseReservedVoucher($locked->voucher_id);
 
@@ -174,7 +177,10 @@ class OrderService
             $released = 0;
 
             foreach ($expiredOrders as $order) {
-                $order->update(['payment_status' => PaymentStatus::Expired]);
+                $order->update([
+                    'payment_status' => PaymentStatus::Expired,
+                    'redeem_status' => RedeemStatus::Failed,
+                ]);
 
                 $this->releaseReservedVoucher($order->voucher_id);
 

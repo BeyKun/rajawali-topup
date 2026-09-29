@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed, ref } from 'vue';
 import {
     AlertTriangle,
     ArrowRight,
@@ -19,7 +20,7 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
-import { formatRupiah, formatShortDay, formatDateTime } from '@/lib/format';
+import { formatDate, formatDateTime, formatRupiah, formatShortDay } from '@/lib/format';
 import type {
     AdminDashboardStats,
     AdminLowStockItem,
@@ -42,7 +43,26 @@ const props = defineProps<{
     recentOrders: AdminRecentOrder[];
 }>();
 
-const maxRevenue = Math.max(...props.salesChart.map((point) => point.revenue), 1);
+const chartMetric = ref<'revenue' | 'orders'>('revenue');
+const hoveredPoint = ref<AdminSalesPoint | null>(null);
+
+const maxRevenue = computed(() => {
+    const raw = Math.max(...props.salesChart.map((point) => point.revenue), 0);
+    return raw > 0 ? raw : 100000;
+});
+
+const maxOrders = computed(() => {
+    const raw = Math.max(...props.salesChart.map((point) => point.orders), 0);
+    return raw > 0 ? raw : 10;
+});
+
+const total7DaysRevenue = computed(() => {
+    return props.salesChart.reduce((sum, p) => sum + p.revenue, 0);
+});
+
+const total7DaysOrders = computed(() => {
+    return props.salesChart.reduce((sum, p) => sum + p.orders, 0);
+});
 </script>
 
 <template>
@@ -119,43 +139,143 @@ const maxRevenue = Math.max(...props.salesChart.map((point) => point.revenue), 1
 
         <div class="grid gap-4 lg:grid-cols-3">
             <Card class="lg:col-span-2">
-                <CardHeader>
-                    <CardTitle class="flex items-center gap-2">
-                        <TrendingUp class="size-4" /> Omset 7 Hari Terakhir
-                    </CardTitle>
-                    <CardDescription>
-                        Pendapatan harian dari transaksi lunas.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div
-                        class="flex h-44 items-end justify-between gap-2 border-b pt-4"
-                    >
-                        <div
-                            v-for="point in props.salesChart"
-                            :key="point.date"
-                            class="flex flex-1 flex-col items-center gap-1"
+                <CardHeader class="flex flex-row flex-wrap items-center justify-between gap-2 pb-2">
+                    <div>
+                        <CardTitle class="flex items-center gap-2">
+                            <TrendingUp class="size-4 text-primary" /> Statistik 7 Hari Terakhir
+                        </CardTitle>
+                        <CardDescription>
+                            Tren omset pendapatan dan volume transaksi harian.
+                        </CardDescription>
+                    </div>
+
+                    <div class="flex items-center gap-1 rounded-lg border bg-muted/40 p-1">
+                        <Button
+                            type="button"
+                            size="sm"
+                            :variant="chartMetric === 'revenue' ? 'default' : 'ghost'"
+                            class="h-7 px-2.5 text-xs font-medium"
+                            @click="chartMetric = 'revenue'"
                         >
-                            <span class="text-[10px] text-muted-foreground">
-                                {{ point.revenue > 0 ? formatRupiah(point.revenue) : '' }}
-                            </span>
+                            Omset (Rp)
+                        </Button>
+                        <Button
+                            type="button"
+                            size="sm"
+                            :variant="chartMetric === 'orders' ? 'default' : 'ghost'"
+                            class="h-7 px-2.5 text-xs font-medium"
+                            @click="chartMetric = 'orders'"
+                        >
+                            Transaksi ({{ total7DaysOrders }})
+                        </Button>
+                    </div>
+                </CardHeader>
+
+                <CardContent class="pt-2">
+                    <!-- Chart container with Y-axis grid and interactive bars -->
+                    <div class="relative pt-6">
+                        <!-- Y-axis guidelines -->
+                        <div class="absolute inset-0 flex flex-col justify-between pointer-events-none pb-6 pr-2">
+                            <div class="flex items-center justify-between border-b border-dashed border-border/60 text-[10px] text-muted-foreground pb-1">
+                                <span>{{ chartMetric === 'revenue' ? formatRupiah(maxRevenue) : `${maxOrders} pesanan` }}</span>
+                            </div>
+                            <div class="flex items-center justify-between border-b border-dashed border-border/60 text-[10px] text-muted-foreground pb-1">
+                                <span>{{ chartMetric === 'revenue' ? formatRupiah(maxRevenue / 2) : `${Math.ceil(maxOrders / 2)} pesanan` }}</span>
+                            </div>
+                            <div class="border-b border-border text-[10px] text-muted-foreground">
+                                <span>0</span>
+                            </div>
+                        </div>
+
+                        <!-- Bar chart columns -->
+                        <div class="relative z-10 flex h-48 items-end justify-between gap-2 sm:gap-3 px-2 sm:px-4 pb-6">
                             <div
-                                class="w-full rounded-t bg-primary/80 transition-all"
-                                :style="{
-                                    height: `${Math.max((point.revenue / maxRevenue) * 100, 2)}%`,
-                                }"
-                                :title="`${point.orders} pesanan`"
-                            ></div>
+                                v-for="point in props.salesChart"
+                                :key="point.date"
+                                class="group relative flex flex-1 flex-col items-center h-full justify-end cursor-pointer"
+                                @mouseenter="hoveredPoint = point"
+                                @mouseleave="hoveredPoint = null"
+                            >
+                                <!-- Value badge above bar -->
+                                <div class="mb-1.5 text-center min-h-[18px]">
+                                    <span
+                                        v-if="chartMetric === 'revenue' && point.revenue > 0"
+                                        class="rounded bg-emerald-500/10 px-1 py-0.5 font-mono text-[9px] sm:text-[10px] font-bold text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-500/20"
+                                    >
+                                        {{ formatRupiah(point.revenue) }}
+                                    </span>
+                                    <span
+                                        v-else-if="chartMetric === 'orders' && point.orders > 0"
+                                        class="rounded bg-blue-500/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-blue-600 dark:text-blue-400 group-hover:bg-blue-500/20"
+                                    >
+                                        {{ point.orders }}x
+                                    </span>
+                                </div>
+
+                                <!-- The Bar Column -->
+                                <div class="w-full max-w-[42px] flex items-end justify-center h-full">
+                                    <div
+                                        class="w-full rounded-t-md transition-all duration-300"
+                                        :class="[
+                                            chartMetric === 'revenue'
+                                                ? point.revenue > 0
+                                                    ? 'bg-gradient-to-t from-emerald-600 to-teal-500 group-hover:from-emerald-500 group-hover:to-teal-400 shadow-xs'
+                                                    : 'bg-muted/80 group-hover:bg-muted-foreground/30'
+                                                : point.orders > 0
+                                                    ? 'bg-gradient-to-t from-blue-600 to-indigo-500 group-hover:from-blue-500 group-hover:to-indigo-400 shadow-xs'
+                                                    : 'bg-muted/80 group-hover:bg-muted-foreground/30'
+                                        ]"
+                                        :style="{
+                                            height: chartMetric === 'revenue'
+                                                ? `${point.revenue > 0 ? Math.max((point.revenue / maxRevenue) * 100, 10) : 4}%`
+                                                : `${point.orders > 0 ? Math.max((point.orders / maxOrders) * 100, 10) : 4}%`,
+                                        }"
+                                    ></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- X Axis dates -->
+                        <div class="flex justify-between gap-2 sm:gap-3 px-2 sm:px-4 pt-1 border-t">
+                            <div
+                                v-for="point in props.salesChart"
+                                :key="point.date"
+                                class="flex-1 text-center"
+                            >
+                                <span class="text-[10px] sm:text-[11px] font-medium text-muted-foreground">
+                                    {{ formatShortDay(point.date) }}
+                                </span>
+                            </div>
                         </div>
                     </div>
-                    <div class="mt-1 flex justify-between gap-2">
-                        <span
-                            v-for="point in props.salesChart"
-                            :key="point.date"
-                            class="flex-1 text-center text-[11px] text-muted-foreground"
-                        >
-                            {{ formatShortDay(point.date) }}
-                        </span>
+
+                    <!-- Detail Tooltip Card when hovering -->
+                    <div
+                        v-if="hoveredPoint"
+                        class="mt-3 flex items-center justify-between rounded-lg border bg-card/90 p-2.5 shadow-xs text-xs animate-in fade-in-50"
+                    >
+                        <div class="font-medium text-foreground">
+                            📅 {{ formatDate(hoveredPoint.date) }}
+                        </div>
+                        <div class="flex items-center gap-3 sm:gap-4">
+                            <span class="text-muted-foreground">
+                                Omset: <strong class="text-emerald-600 dark:text-emerald-400 font-semibold">{{ formatRupiah(hoveredPoint.revenue) }}</strong>
+                            </span>
+                            <span class="text-muted-foreground">
+                                Pesanan: <strong class="text-blue-600 dark:text-blue-400 font-semibold">{{ hoveredPoint.orders }} Transaksi</strong>
+                            </span>
+                        </div>
+                    </div>
+                    <div
+                        v-else
+                        class="mt-3 flex items-center justify-between rounded-lg border bg-muted/20 p-2.5 text-xs text-muted-foreground"
+                    >
+                        <span>Arahkan kursor ke grafik untuk melihat detail harian</span>
+                        <div class="flex items-center gap-3">
+                            <span>Total Omset: <strong class="text-foreground">{{ formatRupiah(total7DaysRevenue) }}</strong></span>
+                            <span>•</span>
+                            <span>Total Pesanan: <strong class="text-foreground">{{ total7DaysOrders }} Transaksi</strong></span>
+                        </div>
                     </div>
                 </CardContent>
             </Card>

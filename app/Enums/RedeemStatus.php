@@ -8,4 +8,5 @@ enum RedeemStatus: string
     case Processing = 'PROCESSING';
     case Success = 'SUCCESS';
     case Failed = 'FAILED';
+    case Canceled = 'CANCELED';
 }
