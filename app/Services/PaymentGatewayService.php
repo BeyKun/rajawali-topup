@@ -230,9 +230,13 @@ class PaymentGatewayService
                 'first_name' => $params['customer_name'] ?? 'Pelanggan',
                 'phone' => $params['msisdn'] ?? null,
             ],
-            'enabled_payments' => (array) config('payment.midtrans.enabled_payments', ['gopay', 'qris', 'bni_va']),
             'custom_field1' => $params['msisdn'] ?? null,
         ];
+
+        $enabledPayments = config('payment.midtrans.enabled_payments');
+        if (! empty($enabledPayments) && is_array($enabledPayments)) {
+            $payload['enabled_payments'] = $enabledPayments;
+        }
 
         try {
             $response = $this->midtrans->createSnapTransaction($payload);

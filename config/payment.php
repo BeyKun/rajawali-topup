@@ -62,12 +62,6 @@ return [
         /** Midtrans integration driver: 'snap' (recommended for production) or 'core'. */
         'driver' => env('MIDTRANS_DRIVER', 'snap'),
 
-        /** Midtrans payment channel used for the topup orders. */
-        'payment_type' => env('MIDTRANS_PAYMENT_TYPE', 'qris'),
-
-        /** Acquiring bank for the QRIS charge (optional, e.g. "gopay", "bca"). */
-        'acquirer' => env('MIDTRANS_ACQUIRER', 'gopay'),
-
         /**
          * Enable Midtrans 3-D Secure / fraud challenge notifications in logs.
          * Not directly used for QRIS but kept for diagnosability.
