@@ -15,3 +15,4 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::post('v1/webhooks/qris', [WebhookController::class, 'qris'])->name('api.webhooks.qris');
+Route::post('v1/webhooks/midtrans', [WebhookController::class, 'qris'])->name('api.webhooks.midtrans');
