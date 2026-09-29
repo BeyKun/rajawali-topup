@@ -3,10 +3,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: rajawali_topup_admin
+    container_name: rajawali_topup
     restart: unless-stopped
-    ports:
-      - "${APP_PORT:-8000}:80"
     env_file:
       - .env
     environment:
