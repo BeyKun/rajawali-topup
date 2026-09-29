@@ -1,0 +1,50 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Development & Environment files
+.env
+.env.*
+!.env.example
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+
+# Dependencies & Build artifacts (rebuilt in Docker)
+node_modules/
+vendor/
+public/build/
+public/hot
+
+# Tests & Analysis
+tests/
+phpunit.xml
+phpstan.neon
+pint.json
+
+# Storage & bootstrap cache dynamic files
+bootstrap/cache/*
+!bootstrap/cache/.gitignore
+storage/*.key
+storage/app/*
+!storage/app/.gitignore
+storage/framework/cache/*
+!storage/framework/cache/.gitignore
+storage/framework/sessions/*
+!storage/framework/sessions/.gitignore
+storage/framework/views/*
+!storage/framework/views/.gitignore
+storage/logs/*
+!storage/logs/.gitignore
+
+# IDEs & System files
+.idea/
+.vscode/
+.agents/
+.commandcode/
+.editorconfig
+*.log
+*.tmp
+Thumbs.db
+.DS_Store
