@@ -2,10 +2,12 @@
 
 namespace App\Jobs;
 
+use App\Enums\PaymentStatus;
 use App\Enums\RedeemStatus;
 use App\Enums\VoucherStatus;
 use App\Models\Order;
 use App\Models\Voucher;
+use App\Services\PaymentGatewayService;
 use App\Services\TelkomselVoucherService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -20,9 +22,9 @@ use Throwable;
  * Redeems a paid order's reserved voucher against the Telkomsel voucher API.
  *
  * The job is retried up to `$tries` times with a growing backoff. Each attempt
- * increments the order's `retry_count`; once the maximum is reached the order is
- * parked as FAILED while the voucher is intentionally left RESERVED so an admin
- * can retry the redemption manually from the dashboard.
+ * increments the order's `retry_count`; once the maximum is reached or when a
+ * permanent failure (such as region mismatch) occurs, the order is marked FAILED,
+ * the voucher is unreserved, and a refund is initiated via the payment gateway.
  */
 class ProcessVoucherRedeemJob implements ShouldQueue
 {
@@ -49,7 +51,7 @@ class ProcessVoucherRedeemJob implements ShouldQueue
     /**
      * Execute the redeem attempt for the order.
      */
-    public function handle(TelkomselVoucherService $telkomsel): void
+    public function handle(TelkomselVoucherService $telkomsel, PaymentGatewayService $paymentGateway): void
     {
         $order = $this->order->fresh();
 
@@ -65,6 +67,10 @@ class ProcessVoucherRedeemJob implements ShouldQueue
             Log::error('Voucher redeem aborted: order has no reserved voucher.', [
                 'order_id' => $order->id,
             ]);
+
+            if ($order->payment_status === PaymentStatus::Paid) {
+                $paymentGateway->refundOrder($order, 'Voucher tidak ditemukan untuk pesanan ini.');
+            }
 
             return;
         }
@@ -82,7 +88,7 @@ class ProcessVoucherRedeemJob implements ShouldQueue
             return;
         }
 
-        $this->handleFailure($order, $result);
+        $this->handleFailure($order, $voucher, $result, $telkomsel, $paymentGateway);
     }
 
     /**
@@ -94,6 +100,13 @@ class ProcessVoucherRedeemJob implements ShouldQueue
 
         if ($order !== null && $order->redeem_status !== RedeemStatus::Success) {
             $order->update(['redeem_status' => RedeemStatus::Failed]);
+
+            if ($order->payment_status === PaymentStatus::Paid) {
+                app(PaymentGatewayService::class)->refundOrder(
+                    $order,
+                    'Gagal aktivasi paket data Telkomsel: '.($exception?->getMessage() ?? 'Antrean proses gagal')
+                );
+            }
         }
     }
 
@@ -124,22 +137,48 @@ class ProcessVoucherRedeemJob implements ShouldQueue
      *
      * @throws RuntimeException To release the job back onto the queue for a retry.
      */
-    protected function handleFailure(Order $order, array $result): void
-    {
+    protected function handleFailure(
+        Order $order,
+        Voucher $voucher,
+        array $result,
+        TelkomselVoucherService $telkomsel,
+        PaymentGatewayService $paymentGateway
+    ): void {
         $order->update([
             'redeem_response_code' => $result['code'],
             'redeem_response_raw' => $result['raw'],
         ]);
 
-        if ($order->retry_count >= $this->tries) {
+        $isPermanent = $telkomsel->isPermanentFailure($result);
+        $exhaustedRetries = $order->retry_count >= $this->tries;
+
+        if ($isPermanent || $exhaustedRetries) {
             $order->update(['redeem_status' => RedeemStatus::Failed]);
 
-            Log::error('Voucher redeem failed after the maximum number of attempts.', [
+            // Release voucher back to available if it failed due to region mismatch or customer ineligibility
+            if ($result['code'] !== '15' && $result['code'] !== '3023') {
+                $voucher->update([
+                    'status' => VoucherStatus::Available,
+                    'reserved_at' => null,
+                ]);
+            }
+
+            $reason = "Aktivasi voucher gagal ({$result['code']}): {$result['description']}";
+            if ($isPermanent) {
+                $reason = "Aktivasi voucher gagal kendala wilayah/nomor ({$result['code']}): {$result['description']}";
+            }
+
+            Log::error('Voucher redeem permanently failed or retries exhausted. Initiating refund.', [
                 'order_id' => $order->id,
                 'code' => $result['code'],
                 'description' => $result['description'],
+                'is_permanent' => $isPermanent,
                 'retry_count' => $order->retry_count,
             ]);
+
+            if ($order->payment_status === PaymentStatus::Paid) {
+                $paymentGateway->refundOrder($order, $reason);
+            }
 
             return;
         }

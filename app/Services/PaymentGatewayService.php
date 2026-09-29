@@ -3,9 +3,12 @@
 namespace App\Services;
 
 use App\Contracts\MidtransClient;
+use App\Enums\PaymentStatus;
+use App\Models\Order;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
 
@@ -92,6 +95,99 @@ class PaymentGatewayService
 
             return false;
         }
+    }
+
+    /**
+     * Attempt to refund an order via the payment gateway.
+     *
+     * In mock mode, a deterministic refund ID is generated and the order transitions to REFUNDED.
+     * With Midtrans, an API refund request is sent. If the channel does not support automated
+     * refund (or returns non-200), the order transitions to REFUND_PENDING so an administrator
+     * can process the refund manually.
+     *
+     * @return array{status: PaymentStatus, refund_id: ?string, message: string}
+     */
+    public function refundOrder(Order $order, string $reason): array
+    {
+        $amount = (int) round((float) $order->total_amount);
+        $transactionId = $order->payment_ref_id ?: $order->order_no;
+
+        if ($this->isMockProvider()) {
+            $mockRefundId = 'MOCK-REF-'.Str::upper(Str::random(8));
+            $order->update([
+                'payment_status' => PaymentStatus::Refunded,
+                'refund_amount' => $order->total_amount,
+                'refund_ref_id' => $mockRefundId,
+                'refund_reason' => $reason,
+                'refunded_at' => now(),
+            ]);
+
+            return [
+                'status' => PaymentStatus::Refunded,
+                'refund_id' => $mockRefundId,
+                'message' => 'Refund berhasil diproses (Mock).',
+            ];
+        }
+
+        if ($this->provider() !== 'midtrans') {
+            $order->update([
+                'payment_status' => PaymentStatus::RefundPending,
+                'refund_amount' => $order->total_amount,
+                'refund_reason' => $reason,
+            ]);
+
+            return [
+                'status' => PaymentStatus::RefundPending,
+                'refund_id' => null,
+                'message' => 'Provider tidak mendukung auto-refund. Memerlukan refund manual.',
+            ];
+        }
+
+        try {
+            $response = $this->midtrans->refund($transactionId, $amount, $reason);
+
+            $statusCode = (string) ($response->status_code ?? '');
+            $refundId = (string) ($response->id ?? $response->refund_key ?? '');
+
+            if ($statusCode === '200') {
+                $order->update([
+                    'payment_status' => PaymentStatus::Refunded,
+                    'refund_amount' => $order->total_amount,
+                    'refund_ref_id' => $refundId ?: ('REF-'.Str::upper(Str::random(8))),
+                    'refund_reason' => $reason,
+                    'refunded_at' => now(),
+                ]);
+
+                return [
+                    'status' => PaymentStatus::Refunded,
+                    'refund_id' => $refundId,
+                    'message' => 'Refund Midtrans berhasil diproses.',
+                ];
+            }
+
+            Log::warning('Midtrans refund returned non-200 status code.', [
+                'order_no' => $order->order_no,
+                'status_code' => $statusCode,
+                'response' => (array) $response,
+            ]);
+        } catch (Throwable $exception) {
+            Log::warning('Midtrans refund API call failed or unsupported for channel. Falling back to REFUND_PENDING.', [
+                'order_no' => $order->order_no,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+
+        $order->update([
+            'payment_status' => PaymentStatus::RefundPending,
+            'refund_amount' => $order->total_amount,
+            'refund_reason' => $reason,
+        ]);
+
+        return [
+            'status' => PaymentStatus::RefundPending,
+            'refund_id' => null,
+            'message' => 'Direct refund tidak didukung oleh channel pembayaran atau ditolak gateway. Memerlukan refund manual.',
+        ];
     }
 
     /**

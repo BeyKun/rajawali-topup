@@ -44,6 +44,20 @@ class SdkMidtransClient implements MidtransClient
     }
 
     /**
+     * {@inheritDoc}
+     */
+    public function refund(string $transactionId, int $amount, string $reason): object
+    {
+        $this->configure();
+
+        return (object) Transaction::refund($transactionId, [
+            'refund_key' => 'ref_'.uniqid(),
+            'amount' => $amount,
+            'reason' => $reason,
+        ]);
+    }
+
+    /**
      * Apply the configured Midtrans credentials to the SDK's static config.
      */
     protected function configure(): void

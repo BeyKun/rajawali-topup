@@ -35,4 +35,14 @@ interface MidtransClient
      * gateway response is discarded and failures surface as exceptions.
      */
     public function cancel(string $transactionId): void;
+
+    /**
+     * Refund a settled transaction (Core API `/v2/{id}/refund`).
+     *
+     * @param  string  $transactionId  Order ID or gateway transaction ID
+     * @param  int  $amount  Refund amount in IDR
+     * @param  string  $reason  Reason for refund
+     * @return object Decoded Midtrans response
+     */
+    public function refund(string $transactionId, int $amount, string $reason): object;
 }

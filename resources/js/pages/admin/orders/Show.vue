@@ -63,6 +63,13 @@ function canCancel(): boolean {
     return props.order.redeem_status !== 'SUCCESS';
 }
 
+function canMarkRefunded(): boolean {
+    return props.order.payment_status === 'REFUND_PENDING';
+}
+
+const refundRefId = ref('');
+const refundReason = ref('');
+
 function retryRedeem(): void {
     processing.value = true;
     router.post(
@@ -77,6 +84,18 @@ function cancelOrder(): void {
     router.post(
         `/admin/orders/${props.order.id}/cancel`,
         {},
+        { preserveScroll: true, onFinish: () => (processing.value = false) },
+    );
+}
+
+function markRefunded(): void {
+    processing.value = true;
+    router.post(
+        `/admin/orders/${props.order.id}/mark-refunded`,
+        {
+            refund_ref_id: refundRefId.value || undefined,
+            refund_reason: refundReason.value || undefined,
+        },
         { preserveScroll: true, onFinish: () => (processing.value = false) },
     );
 }
@@ -163,6 +182,55 @@ function json(value: unknown): string {
                     </a>
                 </Button>
 
+                <Dialog v-if="canMarkRefunded()">
+                    <DialogTrigger as-child>
+                        <Button variant="default" class="bg-purple-600 hover:bg-purple-700 text-white">
+                            <Check class="size-4 mr-1.5" />
+                            Tandai Refund Selesai
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Tandai Refund Telah Selesai?</DialogTitle>
+                            <DialogDescription>
+                                Gunakan aksi ini jika pengembalian dana telah berhasil ditransfer secara manual ke pelanggan atau diproses di portal Midtrans.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div class="space-y-3 py-2">
+                            <div>
+                                <label class="text-xs font-medium text-muted-foreground">ID Referensi Refund (Opsional)</label>
+                                <input
+                                    v-model="refundRefId"
+                                    type="text"
+                                    placeholder="Contoh: REF-12345678 / No. Resi Bank"
+                                    class="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                                />
+                            </div>
+                            <div>
+                                <label class="text-xs font-medium text-muted-foreground">Catatan / Alasan (Opsional)</label>
+                                <input
+                                    v-model="refundReason"
+                                    type="text"
+                                    placeholder="Contoh: Ditransfer manual ke rekening customer BCA"
+                                    class="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                                />
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <DialogClose as-child>
+                                <Button variant="outline">Batal</Button>
+                            </DialogClose>
+                            <Button
+                                class="bg-purple-600 hover:bg-purple-700 text-white"
+                                :disabled="processing"
+                                @click="markRefunded"
+                            >
+                                Ya, Simpan Refund
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
                 <Dialog v-if="canCancel()">
                     <DialogTrigger as-child>
                         <Button variant="outline">
@@ -190,6 +258,55 @@ function json(value: unknown): string {
                 </Dialog>
             </div>
         </div>
+
+        <!-- Refund Information Banner/Card -->
+        <Card
+            v-if="order.payment_status === 'REFUNDED' || order.payment_status === 'REFUND_PENDING' || order.refund_amount"
+            class="border-purple-200 dark:border-purple-900 bg-purple-50/30 dark:bg-purple-950/20"
+        >
+            <CardHeader class="pb-3">
+                <CardTitle class="flex items-center gap-2 text-purple-700 dark:text-purple-300">
+                    <RefreshCw class="size-4" /> Informasi Pengembalian Dana (Refund)
+                </CardTitle>
+                <CardDescription>
+                    Status refund untuk pesanan yang mengalami kegagalan aktivasi voucher.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <dl class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                        <dt class="text-muted-foreground text-xs">Status Refund</dt>
+                        <dd class="mt-1">
+                            <StatusBadge :status="order.payment_status" />
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="text-muted-foreground text-xs">Nominal Refund</dt>
+                        <dd class="mt-1 font-semibold text-foreground">
+                            {{ formatRupiah(order.refund_amount ?? order.total_amount) }}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="text-muted-foreground text-xs">Ref. ID Refund</dt>
+                        <dd class="mt-1 font-mono text-xs text-foreground">
+                            {{ order.refund_ref_id ?? '-' }}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="text-muted-foreground text-xs">Waktu Refund</dt>
+                        <dd class="mt-1 text-foreground">
+                            {{ order.refunded_at ? formatDateTime(order.refunded_at) : '-' }}
+                        </dd>
+                    </div>
+                    <div class="col-span-2 md:col-span-4">
+                        <dt class="text-muted-foreground text-xs">Alasan Refund</dt>
+                        <dd class="mt-1 text-sm text-foreground bg-background/60 p-2.5 rounded border">
+                            {{ order.refund_reason ?? '-' }}
+                        </dd>
+                    </div>
+                </dl>
+            </CardContent>
+        </Card>
 
         <div class="grid gap-4 lg:grid-cols-2">
             <Card>

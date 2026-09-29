@@ -13,6 +13,7 @@ use App\Models\Voucher;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -120,6 +121,10 @@ class OrderController extends Controller
                 'redeem_response_raw' => $order->redeem_response_raw,
                 'voucher_serial_number' => $order->voucher?->serial_number,
                 'voucher_status' => $order->voucher?->status->value,
+                'refund_amount' => $order->refund_amount ? (float) $order->refund_amount : null,
+                'refund_ref_id' => $order->refund_ref_id,
+                'refund_reason' => $order->refund_reason,
+                'refunded_at' => $order->refunded_at?->toIso8601String(),
                 'created_at' => $order->created_at?->toIso8601String(),
             ],
             'apiLogs' => $apiLogs,
@@ -185,6 +190,35 @@ class OrderController extends Controller
         }
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Pesanan dibatalkan dan voucher dikembalikan ke stok.']);
+
+        return back();
+    }
+
+    /**
+     * Manually mark a REFUND_PENDING order as REFUNDED.
+     */
+    public function markRefunded(Request $request, Order $order): RedirectResponse
+    {
+        if ($order->payment_status !== PaymentStatus::RefundPending) {
+            throw ValidationException::withMessages([
+                'order' => 'Hanya pesanan berstatus REFUND_PENDING yang dapat ditandai selesai refund.',
+            ]);
+        }
+
+        $validated = $request->validate([
+            'refund_ref_id' => ['nullable', 'string', 'max:100'],
+            'refund_reason' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $order->update([
+            'payment_status' => PaymentStatus::Refunded,
+            'refund_amount' => $order->total_amount,
+            'refund_ref_id' => $validated['refund_ref_id'] ?? ('MANUAL-'.strtoupper(Str::random(8))),
+            'refund_reason' => $validated['refund_reason'] ?? $order->refund_reason ?? 'Manual refund completed by admin',
+            'refunded_at' => now(),
+        ]);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => "Pesanan {$order->order_no} berhasil ditandai selesai di-refund."]);
 
         return back();
     }

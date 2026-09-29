@@ -45,7 +45,14 @@ export type VoucherCheckResult = {
     status_message: string;
 };
 
-export type PaymentStatus = 'UNPAID' | 'PAID' | 'EXPIRED' | 'FAILED' | 'CANCELED';
+export type PaymentStatus =
+    | 'UNPAID'
+    | 'PAID'
+    | 'EXPIRED'
+    | 'FAILED'
+    | 'CANCELED'
+    | 'REFUNDED'
+    | 'REFUND_PENDING';
 export type RedeemStatus = 'PENDING' | 'PROCESSING' | 'SUCCESS' | 'FAILED' | 'CANCELED';
 
 export type AdminProductRow = {
@@ -107,6 +114,10 @@ export type AdminOrderDetail = {
     redeem_response_raw: Record<string, unknown> | null;
     voucher_serial_number: string | null;
     voucher_status: string | null;
+    refund_amount: number | null;
+    refund_ref_id: string | null;
+    refund_reason: string | null;
+    refunded_at: string | null;
     created_at: string | null;
 };
 

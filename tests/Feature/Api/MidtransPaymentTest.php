@@ -30,6 +30,13 @@ final class FakeMidtransClient implements MidtransClient
 
     public ?Throwable $cancelException = null;
 
+    /** @var list<array{transaction_id: string, amount: int, reason: string}> */
+    public array $refunds = [];
+
+    public ?object $refundResponse = null;
+
+    public ?Throwable $refundException = null;
+
     public function charge(array $payload): object
     {
         $this->charges[] = $payload;
@@ -62,6 +69,25 @@ final class FakeMidtransClient implements MidtransClient
         if ($this->cancelException !== null) {
             throw $this->cancelException;
         }
+    }
+
+    public function refund(string $transactionId, int $amount, string $reason): object
+    {
+        $this->refunds[] = [
+            'transaction_id' => $transactionId,
+            'amount' => $amount,
+            'reason' => $reason,
+        ];
+
+        if ($this->refundException !== null) {
+            throw $this->refundException;
+        }
+
+        return $this->refundResponse ?? (object) [
+            'status_code' => '200',
+            'id' => 'mock-ref-'.uniqid(),
+            'refund_key' => 'ref-'.uniqid(),
+        ];
     }
 }
 

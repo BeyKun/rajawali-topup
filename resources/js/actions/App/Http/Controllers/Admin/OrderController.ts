@@ -1,7 +1,7 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition, type RouteFormDefinition, applyUrlDefaults } from './../../../../../wayfinder'
 /**
 * @see \App\Http\Controllers\Admin\OrderController::index
- * @see app/Http/Controllers/Admin/OrderController.php:25
+ * @see app/Http/Controllers/Admin/OrderController.php:26
  * @route '/admin/orders'
  */
 export const index = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -16,7 +16,7 @@ index.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\OrderController::index
- * @see app/Http/Controllers/Admin/OrderController.php:25
+ * @see app/Http/Controllers/Admin/OrderController.php:26
  * @route '/admin/orders'
  */
 index.url = (options?: RouteQueryOptions) => {
@@ -25,7 +25,7 @@ index.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\Admin\OrderController::index
- * @see app/Http/Controllers/Admin/OrderController.php:25
+ * @see app/Http/Controllers/Admin/OrderController.php:26
  * @route '/admin/orders'
  */
 index.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -34,7 +34,7 @@ index.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
 })
 /**
 * @see \App\Http\Controllers\Admin\OrderController::index
- * @see app/Http/Controllers/Admin/OrderController.php:25
+ * @see app/Http/Controllers/Admin/OrderController.php:26
  * @route '/admin/orders'
  */
 index.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
@@ -44,7 +44,7 @@ index.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
 
     /**
 * @see \App\Http\Controllers\Admin\OrderController::index
- * @see app/Http/Controllers/Admin/OrderController.php:25
+ * @see app/Http/Controllers/Admin/OrderController.php:26
  * @route '/admin/orders'
  */
     const indexForm = (options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -54,7 +54,7 @@ index.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
 
             /**
 * @see \App\Http\Controllers\Admin\OrderController::index
- * @see app/Http/Controllers/Admin/OrderController.php:25
+ * @see app/Http/Controllers/Admin/OrderController.php:26
  * @route '/admin/orders'
  */
         indexForm.get = (options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -63,7 +63,7 @@ index.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
         })
             /**
 * @see \App\Http\Controllers\Admin\OrderController::index
- * @see app/Http/Controllers/Admin/OrderController.php:25
+ * @see app/Http/Controllers/Admin/OrderController.php:26
  * @route '/admin/orders'
  */
         indexForm.head = (options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -79,7 +79,7 @@ index.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
     index.form = indexForm
 /**
 * @see \App\Http\Controllers\Admin\OrderController::show
- * @see app/Http/Controllers/Admin/OrderController.php:71
+ * @see app/Http/Controllers/Admin/OrderController.php:72
  * @route '/admin/orders/{order}'
  */
 export const show = (args: { order: number | { id: number } } | [order: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -94,7 +94,7 @@ show.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\OrderController::show
- * @see app/Http/Controllers/Admin/OrderController.php:71
+ * @see app/Http/Controllers/Admin/OrderController.php:72
  * @route '/admin/orders/{order}'
  */
 show.url = (args: { order: number | { id: number } } | [order: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -127,7 +127,7 @@ show.url = (args: { order: number | { id: number } } | [order: number | { id: nu
 
 /**
 * @see \App\Http\Controllers\Admin\OrderController::show
- * @see app/Http/Controllers/Admin/OrderController.php:71
+ * @see app/Http/Controllers/Admin/OrderController.php:72
  * @route '/admin/orders/{order}'
  */
 show.get = (args: { order: number | { id: number } } | [order: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -136,7 +136,7 @@ show.get = (args: { order: number | { id: number } } | [order: number | { id: nu
 })
 /**
 * @see \App\Http\Controllers\Admin\OrderController::show
- * @see app/Http/Controllers/Admin/OrderController.php:71
+ * @see app/Http/Controllers/Admin/OrderController.php:72
  * @route '/admin/orders/{order}'
  */
 show.head = (args: { order: number | { id: number } } | [order: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'head'> => ({
@@ -146,7 +146,7 @@ show.head = (args: { order: number | { id: number } } | [order: number | { id: n
 
     /**
 * @see \App\Http\Controllers\Admin\OrderController::show
- * @see app/Http/Controllers/Admin/OrderController.php:71
+ * @see app/Http/Controllers/Admin/OrderController.php:72
  * @route '/admin/orders/{order}'
  */
     const showForm = (args: { order: number | { id: number } } | [order: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -156,7 +156,7 @@ show.head = (args: { order: number | { id: number } } | [order: number | { id: n
 
             /**
 * @see \App\Http\Controllers\Admin\OrderController::show
- * @see app/Http/Controllers/Admin/OrderController.php:71
+ * @see app/Http/Controllers/Admin/OrderController.php:72
  * @route '/admin/orders/{order}'
  */
         showForm.get = (args: { order: number | { id: number } } | [order: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -165,7 +165,7 @@ show.head = (args: { order: number | { id: number } } | [order: number | { id: n
         })
             /**
 * @see \App\Http\Controllers\Admin\OrderController::show
- * @see app/Http/Controllers/Admin/OrderController.php:71
+ * @see app/Http/Controllers/Admin/OrderController.php:72
  * @route '/admin/orders/{order}'
  */
         showForm.head = (args: { order: number | { id: number } } | [order: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -181,7 +181,7 @@ show.head = (args: { order: number | { id: number } } | [order: number | { id: n
     show.form = showForm
 /**
 * @see \App\Http\Controllers\Admin\OrderController::retryRedeem
- * @see app/Http/Controllers/Admin/OrderController.php:132
+ * @see app/Http/Controllers/Admin/OrderController.php:137
  * @route '/admin/orders/{order}/retry-redeem'
  */
 export const retryRedeem = (args: { order: number | { id: number } } | [order: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -196,7 +196,7 @@ retryRedeem.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\OrderController::retryRedeem
- * @see app/Http/Controllers/Admin/OrderController.php:132
+ * @see app/Http/Controllers/Admin/OrderController.php:137
  * @route '/admin/orders/{order}/retry-redeem'
  */
 retryRedeem.url = (args: { order: number | { id: number } } | [order: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -229,7 +229,7 @@ retryRedeem.url = (args: { order: number | { id: number } } | [order: number | {
 
 /**
 * @see \App\Http\Controllers\Admin\OrderController::retryRedeem
- * @see app/Http/Controllers/Admin/OrderController.php:132
+ * @see app/Http/Controllers/Admin/OrderController.php:137
  * @route '/admin/orders/{order}/retry-redeem'
  */
 retryRedeem.post = (args: { order: number | { id: number } } | [order: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -239,7 +239,7 @@ retryRedeem.post = (args: { order: number | { id: number } } | [order: number | 
 
     /**
 * @see \App\Http\Controllers\Admin\OrderController::retryRedeem
- * @see app/Http/Controllers/Admin/OrderController.php:132
+ * @see app/Http/Controllers/Admin/OrderController.php:137
  * @route '/admin/orders/{order}/retry-redeem'
  */
     const retryRedeemForm = (args: { order: number | { id: number } } | [order: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -249,7 +249,7 @@ retryRedeem.post = (args: { order: number | { id: number } } | [order: number | 
 
             /**
 * @see \App\Http\Controllers\Admin\OrderController::retryRedeem
- * @see app/Http/Controllers/Admin/OrderController.php:132
+ * @see app/Http/Controllers/Admin/OrderController.php:137
  * @route '/admin/orders/{order}/retry-redeem'
  */
         retryRedeemForm.post = (args: { order: number | { id: number } } | [order: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -260,7 +260,7 @@ retryRedeem.post = (args: { order: number | { id: number } } | [order: number | 
     retryRedeem.form = retryRedeemForm
 /**
 * @see \App\Http\Controllers\Admin\OrderController::cancel
- * @see app/Http/Controllers/Admin/OrderController.php:164
+ * @see app/Http/Controllers/Admin/OrderController.php:169
  * @route '/admin/orders/{order}/cancel'
  */
 export const cancel = (args: { order: number | { id: number } } | [order: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -275,7 +275,7 @@ cancel.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\OrderController::cancel
- * @see app/Http/Controllers/Admin/OrderController.php:164
+ * @see app/Http/Controllers/Admin/OrderController.php:169
  * @route '/admin/orders/{order}/cancel'
  */
 cancel.url = (args: { order: number | { id: number } } | [order: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -308,7 +308,7 @@ cancel.url = (args: { order: number | { id: number } } | [order: number | { id: 
 
 /**
 * @see \App\Http\Controllers\Admin\OrderController::cancel
- * @see app/Http/Controllers/Admin/OrderController.php:164
+ * @see app/Http/Controllers/Admin/OrderController.php:169
  * @route '/admin/orders/{order}/cancel'
  */
 cancel.post = (args: { order: number | { id: number } } | [order: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -318,7 +318,7 @@ cancel.post = (args: { order: number | { id: number } } | [order: number | { id:
 
     /**
 * @see \App\Http\Controllers\Admin\OrderController::cancel
- * @see app/Http/Controllers/Admin/OrderController.php:164
+ * @see app/Http/Controllers/Admin/OrderController.php:169
  * @route '/admin/orders/{order}/cancel'
  */
     const cancelForm = (args: { order: number | { id: number } } | [order: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -328,7 +328,7 @@ cancel.post = (args: { order: number | { id: number } } | [order: number | { id:
 
             /**
 * @see \App\Http\Controllers\Admin\OrderController::cancel
- * @see app/Http/Controllers/Admin/OrderController.php:164
+ * @see app/Http/Controllers/Admin/OrderController.php:169
  * @route '/admin/orders/{order}/cancel'
  */
         cancelForm.post = (args: { order: number | { id: number } } | [order: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -337,6 +337,85 @@ cancel.post = (args: { order: number | { id: number } } | [order: number | { id:
         })
     
     cancel.form = cancelForm
-const OrderController = { index, show, retryRedeem, cancel }
+/**
+* @see \App\Http\Controllers\Admin\OrderController::markRefunded
+ * @see app/Http/Controllers/Admin/OrderController.php:200
+ * @route '/admin/orders/{order}/mark-refunded'
+ */
+export const markRefunded = (args: { order: number | { id: number } } | [order: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
+    url: markRefunded.url(args, options),
+    method: 'post',
+})
+
+markRefunded.definition = {
+    methods: ["post"],
+    url: '/admin/orders/{order}/mark-refunded',
+} satisfies RouteDefinition<["post"]>
+
+/**
+* @see \App\Http\Controllers\Admin\OrderController::markRefunded
+ * @see app/Http/Controllers/Admin/OrderController.php:200
+ * @route '/admin/orders/{order}/mark-refunded'
+ */
+markRefunded.url = (args: { order: number | { id: number } } | [order: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
+    if (typeof args === 'string' || typeof args === 'number') {
+        args = { order: args }
+    }
+
+            if (typeof args === 'object' && !Array.isArray(args) && 'id' in args) {
+            args = { order: args.id }
+        }
+    
+    if (Array.isArray(args)) {
+        args = {
+                    order: args[0],
+                }
+    }
+
+    args = applyUrlDefaults(args)
+
+    const parsedArgs = {
+                        order: typeof args.order === 'object'
+                ? args.order.id
+                : args.order,
+                }
+
+    return markRefunded.definition.url
+            .replace('{order}', parsedArgs.order.toString())
+            .replace(/\/+$/, '') + queryParams(options)
+}
+
+/**
+* @see \App\Http\Controllers\Admin\OrderController::markRefunded
+ * @see app/Http/Controllers/Admin/OrderController.php:200
+ * @route '/admin/orders/{order}/mark-refunded'
+ */
+markRefunded.post = (args: { order: number | { id: number } } | [order: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
+    url: markRefunded.url(args, options),
+    method: 'post',
+})
+
+    /**
+* @see \App\Http\Controllers\Admin\OrderController::markRefunded
+ * @see app/Http/Controllers/Admin/OrderController.php:200
+ * @route '/admin/orders/{order}/mark-refunded'
+ */
+    const markRefundedForm = (args: { order: number | { id: number } } | [order: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
+        action: markRefunded.url(args, options),
+        method: 'post',
+    })
+
+            /**
+* @see \App\Http\Controllers\Admin\OrderController::markRefunded
+ * @see app/Http/Controllers/Admin/OrderController.php:200
+ * @route '/admin/orders/{order}/mark-refunded'
+ */
+        markRefundedForm.post = (args: { order: number | { id: number } } | [order: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
+            action: markRefunded.url(args, options),
+            method: 'post',
+        })
+    
+    markRefunded.form = markRefundedForm
+const OrderController = { index, show, retryRedeem, cancel, markRefunded }
 
 export default OrderController

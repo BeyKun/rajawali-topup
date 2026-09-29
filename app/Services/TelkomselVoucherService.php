@@ -202,6 +202,44 @@ class TelkomselVoucherService
     }
 
     /**
+     * Check whether a redeem failure is permanent (non-retryable).
+     *
+     * Permanent failures include invalid region / zona mismatch, HRN not found,
+     * voucher already used, or customer/nomor ineligible.
+     *
+     * @param  array{success: bool, code: string, description: string, raw: array<array-key, mixed>}  $result
+     */
+    public function isPermanentFailure(array $result): bool
+    {
+        if ($result['success'] ?? false) {
+            return false;
+        }
+
+        $code = (string) ($result['code'] ?? '');
+        $description = strtolower((string) ($result['description'] ?? ''));
+
+        // Known unrecoverable Telkomsel error codes:
+        // '15' = VoucherAlreadyUsed
+        // '3023' = HRNNotFound
+        if (in_array($code, ['15', '3023'], true)) {
+            return true;
+        }
+
+        // Keywords indicating region mismatch, zona invalid, or number ineligibility
+        $pattern = '/(region|zona|wilayah|cluster|area|tidak sesuai|not match|bukan peruntukan|berbeda|invalid region|not eligible|ineligible)/i';
+        if (preg_match($pattern, $description) === 1) {
+            return true;
+        }
+
+        $rawString = json_encode($result['raw'] ?? []);
+        if ($rawString !== false && preg_match($pattern, $rawString) === 1) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * Deterministic fake payload used instead of a real /check call in mock mode.
      *
      * @return array<array-key, mixed>

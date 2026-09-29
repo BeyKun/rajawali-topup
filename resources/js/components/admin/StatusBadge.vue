@@ -23,6 +23,8 @@ const variantMap: Record<string, BadgeVariant> = {
     INACTIVE: 'outline',
     CANCELED: 'destructive',
     CANCELLED: 'destructive',
+    REFUNDED: 'secondary',
+    REFUND_PENDING: 'secondary',
 };
 
 const classMap: Record<string, string> = {
@@ -36,6 +38,8 @@ const classMap: Record<string, string> = {
     FAILED: 'bg-red-600 text-white hover:bg-red-600/90',
     CANCELED: 'bg-red-600 text-white hover:bg-red-600/90',
     CANCELLED: 'bg-red-600 text-white hover:bg-red-600/90',
+    REFUNDED: 'bg-purple-600 text-white hover:bg-purple-600/90',
+    REFUND_PENDING: 'bg-orange-500 text-white hover:bg-orange-500/90',
     EXPIRED: 'text-muted-foreground',
     UNPAID: 'text-muted-foreground',
     ACTIVE: 'bg-emerald-600 text-white hover:bg-emerald-600/90',
@@ -46,6 +50,12 @@ const extraClass = computed(() => classMap[props.status] ?? '');
 const displayLabel = computed(() => {
     if (props.status === 'CANCELED' || props.status === 'CANCELLED') {
         return 'Canceled';
+    }
+    if (props.status === 'REFUNDED') {
+        return 'Refunded';
+    }
+    if (props.status === 'REFUND_PENDING') {
+        return 'Refund Pending';
     }
     return props.status;
 });

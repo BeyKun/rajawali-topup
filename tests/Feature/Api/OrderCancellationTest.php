@@ -43,6 +43,15 @@ final class RecordingMidtransClient implements MidtransClient
             throw $this->cancelException;
         }
     }
+
+    public function refund(string $transactionId, int $amount, string $reason): object
+    {
+        return (object) [
+            'status_code' => '200',
+            'id' => 'mock-ref-'.uniqid(),
+            'refund_key' => 'ref-'.uniqid(),
+        ];
+    }
 }
 
 beforeEach(function () {

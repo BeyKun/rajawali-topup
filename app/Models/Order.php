@@ -29,13 +29,17 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $qris_expired_at
  * @property string|null $payment_ref_id
  * @property Carbon|null $paid_at
+ * @property string|null $refund_amount
+ * @property string|null $refund_ref_id
+ * @property string|null $refund_reason
+ * @property Carbon|null $refunded_at
  * @property string|null $redeem_response_code
  * @property array|null $redeem_response_raw
  * @property int $retry_count
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['order_no', 'user_id', 'product_id', 'voucher_id', 'msisdn', 'amount', 'admin_fee', 'total_amount', 'payment_channel', 'payment_status', 'redeem_status', 'qris_string', 'qris_url', 'qris_expired_at', 'payment_ref_id', 'paid_at', 'redeem_response_code', 'redeem_response_raw', 'retry_count'])]
+#[Fillable(['order_no', 'user_id', 'product_id', 'voucher_id', 'msisdn', 'amount', 'admin_fee', 'total_amount', 'payment_channel', 'payment_status', 'redeem_status', 'qris_string', 'qris_url', 'qris_expired_at', 'payment_ref_id', 'paid_at', 'refund_amount', 'refund_ref_id', 'refund_reason', 'refunded_at', 'redeem_response_code', 'redeem_response_raw', 'retry_count'])]
 class Order extends Model
 {
     /** @use HasFactory<OrderFactory> */
@@ -52,10 +56,12 @@ class Order extends Model
             'amount' => 'decimal:2',
             'admin_fee' => 'decimal:2',
             'total_amount' => 'decimal:2',
+            'refund_amount' => 'decimal:2',
             'payment_status' => PaymentStatus::class,
             'redeem_status' => RedeemStatus::class,
             'qris_expired_at' => 'datetime',
             'paid_at' => 'datetime',
+            'refunded_at' => 'datetime',
             'redeem_response_raw' => 'array',
             'retry_count' => 'integer',
         ];
