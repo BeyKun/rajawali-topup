@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Google\Client;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
@@ -42,16 +43,32 @@ class GoogleAuthService
     protected function verifyWithGoogle(string $idToken): ?array
     {
         try {
-            $client = new Client(['client_id' => config('services.google.client_id')]);
-            $client->setClientId((string) config('services.google.client_id'));
-            $client->setClientSecret((string) config('services.google.client_secret'));
+            $clientId = (string) config('services.google.client_id');
+            $clientSecret = (string) config('services.google.client_secret');
+
+            $client = new Client(['client_id' => $clientId]);
+            if ($clientSecret !== '') {
+                $client->setClientSecret($clientSecret);
+            }
 
             $payload = $client->verifyIdToken($idToken);
-        } catch (Throwable) {
+            if (! $payload) {
+                // Also attempt verification with Android client ID in case audience is the Android client
+                $androidClientId = '49256917361-qio2861cio6aj46h6k27fggfgti9l4mq.apps.googleusercontent.com';
+                $clientAlt = new Client(['client_id' => $androidClientId]);
+                $payload = $clientAlt->verifyIdToken($idToken);
+            }
+        } catch (Throwable $e) {
+            Log::warning('Google ID token verification failed with exception: ' . $e->getMessage(), [
+                'exception' => $e,
+            ]);
             return null;
         }
 
         if (! is_array($payload) || empty($payload['sub']) || empty($payload['email'])) {
+            Log::warning('Google ID token verification returned invalid payload', [
+                'payload' => $payload,
+            ]);
             return null;
         }
 
