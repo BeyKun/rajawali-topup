@@ -18,16 +18,14 @@ services:
       - rajawali_storage_logs:/var/www/html/storage/logs
     security_opt:
       - no-new-privileges:true
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://127.0.0.1/ || exit 1"]
+      test: [ "CMD-SHELL", "curl -f http://127.0.0.1/ || exit 1" ]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 15s
     networks:
-      - rajawali-network
+      - nginx-proxy-manager_default
 
 volumes:
   rajawali_storage_app:
@@ -36,6 +34,5 @@ volumes:
     name: rajawali_storage_logs
 
 networks:
-  rajawali-network:
-    name: rajawali-network
-    driver: bridge
+  nginx-proxy-manager_default:
+    external: true

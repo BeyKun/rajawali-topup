@@ -23,14 +23,8 @@ class AdminUserSeeder extends Seeder
             [
                 'email' => env('SEED_SUPER_ADMIN_EMAIL', 'admin@rajawalitopup.com'),
                 'name' => env('SEED_SUPER_ADMIN_NAME', 'Super Admin'),
-                'password' => env('SEED_SUPER_ADMIN_PASSWORD', 'password'),
+                'password' => env('SEED_SUPER_ADMIN_PASSWORD', '@R4jaWal1!'),
                 'role' => UserRole::SuperAdmin,
-            ],
-            [
-                'email' => env('SEED_OPERATOR_EMAIL', 'operator@rajawalitopup.com'),
-                'name' => env('SEED_OPERATOR_NAME', 'Operator Kasir'),
-                'password' => env('SEED_OPERATOR_PASSWORD', 'password'),
-                'role' => UserRole::Operator,
             ],
         ];
 
