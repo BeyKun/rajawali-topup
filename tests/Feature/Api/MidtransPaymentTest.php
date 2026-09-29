@@ -117,6 +117,29 @@ test('midtrans invoice creation posts a qris charge and maps the response', func
         ->and($invoice['expired_at']->toDateTimeString())->toBe('2026-09-24 06:45:00');
 });
 
+test('midtrans invoice creation supports gopay payment type without qris key', function () {
+    config()->set('payment.midtrans.payment_type', 'gopay');
+
+    $this->fake->response = (object) midtransQrisResponse('RJW-20260924-0002');
+
+    $invoice = app(PaymentGatewayService::class)->createQrisInvoice([
+        'order_no' => 'RJW-20260924-0002',
+        'amount' => 15000,
+        'customer_name' => 'Budi Santoso',
+        'msisdn' => '6282233456777',
+    ]);
+
+    expect($this->fake->charges)->toHaveCount(1);
+
+    $charge = $this->fake->charges[0];
+
+    expect($charge['payment_type'])->toBe('gopay')
+        ->and($charge['transaction_details']['order_id'])->toBe('RJW-20260924-0002')
+        ->and($charge['transaction_details']['gross_amount'])->toBe(15000)
+        ->and(isset($charge['qris']))->toBeFalse()
+        ->and($invoice['transaction_id'])->toBe('txn-RJW-20260924-0002');
+});
+
 test('a gateway failure during checkout releases the reserved voucher', function () {
     $this->fake->exception = new RuntimeException('network down');
 

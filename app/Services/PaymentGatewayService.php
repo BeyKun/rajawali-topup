@@ -200,18 +200,23 @@ class PaymentGatewayService
 
         $orderNo = $params['order_no'];
 
+        $paymentType = (string) config('payment.midtrans.payment_type', 'qris');
+
         /** @var array<string, mixed> $charge */
         $charge = [
-            'payment_type' => (string) config('payment.midtrans.payment_type', 'qris'),
+            'payment_type' => $paymentType,
             'transaction_details' => [
                 'order_id' => $orderNo,
                 'gross_amount' => (int) round((float) $params['amount']),
             ],
-            'qris' => [
-                'acquirer' => (string) config('payment.midtrans.acquirer', 'gopay'),
-            ],
             'custom_field1' => $params['msisdn'] ?? null,
         ];
+
+        if ($paymentType === 'qris') {
+            $charge['qris'] = [
+                'acquirer' => (string) config('payment.midtrans.acquirer', 'gopay'),
+            ];
+        }
 
         if (! empty($params['customer_name'])) {
             $charge['customer_details'] = [
