@@ -70,6 +70,18 @@ class UserFactory extends Factory
     }
 
     /**
+     * Indicate that the user is a kabupaten-scoped admin.
+     */
+    public function kabupatenAdmin(?int $provinceId = null, ?int $cityId = null): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => UserRole::KabupatenAdmin,
+            'province_id' => $provinceId,
+            'city_id' => $cityId,
+        ]);
+    }
+
+    /**
      * Indicate that the user is a regular customer (mobile app user).
      */
     public function customer(): static

@@ -2,7 +2,9 @@
 
 use App\Http\Controllers\Api\Auth\GoogleAuthController;
 use App\Http\Controllers\Api\OrderController;
+use App\Http\Controllers\Api\OutletProfileController;
 use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\RegionController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -24,7 +26,20 @@ Route::prefix('v1')->group(function (): void {
     Route::get('products', [ProductController::class, 'index'])
         ->name('api.v1.products.index');
 
+    Route::prefix('regions')->name('api.v1.regions.')->group(function (): void {
+        Route::get('provinces', [RegionController::class, 'provinces'])->name('provinces');
+        Route::get('cities', [RegionController::class, 'cities'])->name('cities');
+        Route::get('districts', [RegionController::class, 'districts'])->name('districts');
+        Route::get('villages', [RegionController::class, 'villages'])->name('villages');
+    });
+
     Route::middleware('auth:sanctum')->group(function (): void {
+        Route::get('profile', [OutletProfileController::class, 'show'])
+            ->name('api.v1.profile.show');
+
+        Route::put('profile', [OutletProfileController::class, 'update'])
+            ->name('api.v1.profile.update');
+
         Route::post('orders', [OrderController::class, 'store'])
             ->middleware('throttle:30,1')
             ->name('api.v1.orders.store');

@@ -36,6 +36,7 @@ class OrderController extends Controller
 
         $orders = Order::query()
             ->with(['user:id,name', 'product:id,name'])
+            ->forCity($request->user()?->isKabupatenAdmin() ? $request->user()->city_id : null)
             ->when($filters['order_no'], fn (Builder $query, string $orderNo) => $query->where('order_no', 'like', "%{$orderNo}%"))
             ->when($filters['msisdn'], fn (Builder $query, string $msisdn) => $query->where('msisdn', 'like', "%{$msisdn}%"))
             ->when($filters['payment_status'], fn (Builder $query, string $status) => $query->where('payment_status', $status))

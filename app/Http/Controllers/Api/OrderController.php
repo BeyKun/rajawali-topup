@@ -32,6 +32,13 @@ class OrderController extends Controller
         /** @var User $user */
         $user = $request->user();
 
+        if (! $user->isOutletProfileComplete()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Lengkapi profil outlet terlebih dahulu sebelum melakukan transaksi.',
+            ], 422);
+        }
+
         $order = $this->orderService->createOrder(
             $user,
             (int) $request->validated('product_id'),

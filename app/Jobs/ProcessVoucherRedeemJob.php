@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Enums\PaymentStatus;
 use App\Enums\RedeemStatus;
 use App\Enums\VoucherStatus;
+use App\Enums\WhatsAppEvent;
 use App\Models\Order;
 use App\Models\Voucher;
 use App\Services\PaymentGatewayService;
@@ -80,6 +81,8 @@ class ProcessVoucherRedeemJob implements ShouldQueue
             'retry_count' => $order->retry_count + 1,
         ]);
 
+        NotifyWhatsAppChannelJob::dispatchFor($order, WhatsAppEvent::Redeeming);
+
         $result = $telkomsel->redeemVoucher($voucher->hrn, $order->msisdn, $order->id, $voucher->id);
 
         if ($result['success'] && $result['code'] === self::SUCCESS_CODE) {
@@ -107,6 +110,8 @@ class ProcessVoucherRedeemJob implements ShouldQueue
                     'Gagal aktivasi paket data Telkomsel: '.($exception?->getMessage() ?? 'Antrean proses gagal')
                 );
             }
+
+            NotifyWhatsAppChannelJob::dispatchFor($order, WhatsAppEvent::Failed);
         }
     }
 
@@ -128,6 +133,8 @@ class ProcessVoucherRedeemJob implements ShouldQueue
             'redeem_response_code' => $result['code'],
             'redeem_response_raw' => $result['raw'],
         ]);
+
+        NotifyWhatsAppChannelJob::dispatchFor($order, WhatsAppEvent::Success);
     }
 
     /**
@@ -179,6 +186,8 @@ class ProcessVoucherRedeemJob implements ShouldQueue
             if ($order->payment_status === PaymentStatus::Paid) {
                 $paymentGateway->refundOrder($order, $reason);
             }
+
+            NotifyWhatsAppChannelJob::dispatchFor($order, WhatsAppEvent::Failed);
 
             return;
         }

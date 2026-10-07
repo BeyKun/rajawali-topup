@@ -34,6 +34,8 @@ class GoogleAuthController extends Controller
 
         $user = DB::transaction(fn (): User => $this->findOrCreateUser($identity));
 
+        $user->loadMissing('outletProfile.province', 'outletProfile.city', 'outletProfile.district', 'outletProfile.village');
+
         $token = $user->createToken('mobile')->plainTextToken;
 
         return response()->json([

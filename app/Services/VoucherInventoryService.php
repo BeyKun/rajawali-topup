@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Enums\VoucherStatus;
 use App\Models\Product;
+use App\Models\TelkomselArea;
+use App\Models\User;
 use App\Models\Voucher;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -61,7 +63,9 @@ class VoucherInventoryService
         }
 
         return DB::transaction(function () use ($check, $serialNumber, $hrn, $sellPrice, $adminId): Voucher {
-            $product = $this->resolveProduct($check, $sellPrice);
+            $cityId = $this->resolveCityId($check['region'], $adminId);
+
+            $product = $this->resolveProduct($check, $sellPrice, $cityId);
 
             return Voucher::query()->create([
                 'product_id' => $product->id,
@@ -71,6 +75,7 @@ class VoucherInventoryService
                 'validity' => $check['validity'] !== '' ? $check['validity'] : null,
                 'expired_date' => $check['expired_date'] !== '' ? $check['expired_date'] : null,
                 'region' => $check['region'] !== '' ? $check['region'] : null,
+                'city_id' => $cityId,
                 'telkomsel_check_response' => $check['raw'],
                 'created_by' => $adminId,
             ]);
@@ -102,10 +107,10 @@ class VoucherInventoryService
      *
      * @param  array{name: string, description: string, validity: string, region: string}  $check
      */
-    protected function resolveProduct(array $check, ?float $sellPrice): Product
+    protected function resolveProduct(array $check, ?float $sellPrice, ?int $cityId = null): Product
     {
         $name = $this->deriveProductName($check);
-        $slug = $this->deriveProductSlug($name, $check);
+        $slug = $this->deriveProductSlug($name, $check, $cityId);
 
         $product = Product::query()->firstOrNew(['slug' => $slug]);
 
@@ -114,6 +119,10 @@ class VoucherInventoryService
         $product->validity_days = $this->parseValidityDays($check['validity']);
         $product->region = $check['region'] !== '' ? $check['region'] : null;
         $product->hpp_price = $product->hpp_price ?? 0;
+
+        if ($cityId !== null) {
+            $product->city_id = $cityId;
+        }
 
         if ($sellPrice !== null) {
             $product->sell_price = $sellPrice;
@@ -126,6 +135,38 @@ class VoucherInventoryService
         $product->save();
 
         return $product;
+    }
+
+    /**
+     * Resolve the administrative city for a voucher.
+     *
+     * The Telkomsel zone returned by /check is looked up in `telkomsel_areas`.
+     * When the zone is not mapped, the acting admin's own city is used as the
+     * fallback so a kabupaten admin's vouchers are always attributed to them.
+     */
+    protected function resolveCityId(string $region, ?int $adminId): ?int
+    {
+        $region = trim($region);
+
+        if ($region !== '') {
+            $mapped = TelkomselArea::query()
+                ->whereRaw('LOWER(region) = ?', [strtolower($region)])
+                ->value('city_id');
+
+            if ($mapped !== null) {
+                return (int) $mapped;
+            }
+        }
+
+        if ($adminId !== null) {
+            $cityId = User::query()->whereKey($adminId)->value('city_id');
+
+            if ($cityId !== null) {
+                return (int) $cityId;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -148,13 +189,13 @@ class VoucherInventoryService
      * Derive a stable, unique slug that also encodes the package identity.
      *
      * The identity hash guarantees that two packages sharing a display name but
-     * differing in quota or region never collapse into a single product.
+     * differing in quota, region or assigned city never collapse into a single product.
      *
      * @param  array{name: string, description: string, validity: string, region: string}  $check
      */
-    protected function deriveProductSlug(string $name, array $check): string
+    protected function deriveProductSlug(string $name, array $check, ?int $cityId = null): string
     {
-        $identity = implode('|', [$name, $check['description'], $check['validity'], $check['region']]);
+        $identity = implode('|', [$name, $check['description'], $check['validity'], $check['region'], (string) $cityId]);
         $suffix = substr(sha1($identity), 0, 8);
         $base = Str::limit(Str::slug($name), self::PRODUCT_SLUG_LIMIT, '');
 

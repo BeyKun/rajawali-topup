@@ -6,6 +6,7 @@ use App\Enums\VoucherStatus;
 use Database\Factories\VoucherFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -20,6 +21,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $validity
  * @property string|null $expired_date
  * @property string|null $region
+ * @property int|null $city_id
  * @property array|null $telkomsel_check_response
  * @property Carbon|null $reserved_at
  * @property Carbon|null $redeemed_at
@@ -29,7 +31,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['product_id', 'serial_number', 'hrn', 'status', 'validity', 'expired_date', 'region', 'telkomsel_check_response', 'reserved_at', 'redeemed_at', 'redeemed_msisdn', 'telkomsel_trace_id', 'created_by'])]
+#[Fillable(['product_id', 'serial_number', 'hrn', 'status', 'validity', 'expired_date', 'region', 'city_id', 'telkomsel_check_response', 'reserved_at', 'redeemed_at', 'redeemed_msisdn', 'telkomsel_trace_id', 'created_by'])]
 #[Hidden(['hrn'])]
 class Voucher extends Model
 {
@@ -60,5 +62,20 @@ class Voucher extends Model
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function city(): BelongsTo
+    {
+        return $this->belongsTo(City::class);
+    }
+
+    /**
+     * Limit the query to a single city, used to scope kabupaten admins.
+     *
+     * @param  Builder<Voucher>  $query
+     */
+    public function scopeForCity(Builder $query, ?int $cityId): Builder
+    {
+        return $cityId === null ? $query : $query->where('city_id', $cityId);
     }
 }

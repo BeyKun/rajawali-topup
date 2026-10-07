@@ -1,7 +1,7 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition, type RouteFormDefinition } from './../../../wayfinder'
 /**
 * @see \App\Http\Controllers\Api\WebhookController::qris
- * @see app/Http/Controllers/Api/WebhookController.php:28
+ * @see app/Http/Controllers/Api/WebhookController.php:30
  * @route '/api/v1/webhooks/qris'
  */
 export const qris = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -16,7 +16,7 @@ qris.definition = {
 
 /**
 * @see \App\Http\Controllers\Api\WebhookController::qris
- * @see app/Http/Controllers/Api/WebhookController.php:28
+ * @see app/Http/Controllers/Api/WebhookController.php:30
  * @route '/api/v1/webhooks/qris'
  */
 qris.url = (options?: RouteQueryOptions) => {
@@ -25,7 +25,7 @@ qris.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\Api\WebhookController::qris
- * @see app/Http/Controllers/Api/WebhookController.php:28
+ * @see app/Http/Controllers/Api/WebhookController.php:30
  * @route '/api/v1/webhooks/qris'
  */
 qris.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -35,7 +35,7 @@ qris.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
 
     /**
 * @see \App\Http\Controllers\Api\WebhookController::qris
- * @see app/Http/Controllers/Api/WebhookController.php:28
+ * @see app/Http/Controllers/Api/WebhookController.php:30
  * @route '/api/v1/webhooks/qris'
  */
     const qrisForm = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -45,7 +45,7 @@ qris.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
 
             /**
 * @see \App\Http\Controllers\Api\WebhookController::qris
- * @see app/Http/Controllers/Api/WebhookController.php:28
+ * @see app/Http/Controllers/Api/WebhookController.php:30
  * @route '/api/v1/webhooks/qris'
  */
         qrisForm.post = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -56,7 +56,7 @@ qris.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
     qris.form = qrisForm
 /**
 * @see \App\Http\Controllers\Api\WebhookController::midtrans
- * @see app/Http/Controllers/Api/WebhookController.php:28
+ * @see app/Http/Controllers/Api/WebhookController.php:30
  * @route '/api/v1/webhooks/midtrans'
  */
 export const midtrans = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -71,7 +71,7 @@ midtrans.definition = {
 
 /**
 * @see \App\Http\Controllers\Api\WebhookController::midtrans
- * @see app/Http/Controllers/Api/WebhookController.php:28
+ * @see app/Http/Controllers/Api/WebhookController.php:30
  * @route '/api/v1/webhooks/midtrans'
  */
 midtrans.url = (options?: RouteQueryOptions) => {
@@ -80,7 +80,7 @@ midtrans.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\Api\WebhookController::midtrans
- * @see app/Http/Controllers/Api/WebhookController.php:28
+ * @see app/Http/Controllers/Api/WebhookController.php:30
  * @route '/api/v1/webhooks/midtrans'
  */
 midtrans.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -90,7 +90,7 @@ midtrans.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
 
     /**
 * @see \App\Http\Controllers\Api\WebhookController::midtrans
- * @see app/Http/Controllers/Api/WebhookController.php:28
+ * @see app/Http/Controllers/Api/WebhookController.php:30
  * @route '/api/v1/webhooks/midtrans'
  */
     const midtransForm = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -100,7 +100,7 @@ midtrans.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
 
             /**
 * @see \App\Http\Controllers\Api\WebhookController::midtrans
- * @see app/Http/Controllers/Api/WebhookController.php:28
+ * @see app/Http/Controllers/Api/WebhookController.php:30
  * @route '/api/v1/webhooks/midtrans'
  */
         midtransForm.post = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({

@@ -1,7 +1,7 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition, type RouteFormDefinition } from './../../../../../wayfinder'
 /**
 * @see \App\Http\Controllers\Api\WebhookController::qris
- * @see app/Http/Controllers/Api/WebhookController.php:28
+ * @see app/Http/Controllers/Api/WebhookController.php:30
  * @route '/api/v1/webhooks/qris'
  */
 const qris3d980f8e9c18ecd027c46b716501cc9d = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -16,7 +16,7 @@ qris3d980f8e9c18ecd027c46b716501cc9d.definition = {
 
 /**
 * @see \App\Http\Controllers\Api\WebhookController::qris
- * @see app/Http/Controllers/Api/WebhookController.php:28
+ * @see app/Http/Controllers/Api/WebhookController.php:30
  * @route '/api/v1/webhooks/qris'
  */
 qris3d980f8e9c18ecd027c46b716501cc9d.url = (options?: RouteQueryOptions) => {
@@ -25,7 +25,7 @@ qris3d980f8e9c18ecd027c46b716501cc9d.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\Api\WebhookController::qris
- * @see app/Http/Controllers/Api/WebhookController.php:28
+ * @see app/Http/Controllers/Api/WebhookController.php:30
  * @route '/api/v1/webhooks/qris'
  */
 qris3d980f8e9c18ecd027c46b716501cc9d.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -35,7 +35,7 @@ qris3d980f8e9c18ecd027c46b716501cc9d.post = (options?: RouteQueryOptions): Route
 
     /**
 * @see \App\Http\Controllers\Api\WebhookController::qris
- * @see app/Http/Controllers/Api/WebhookController.php:28
+ * @see app/Http/Controllers/Api/WebhookController.php:30
  * @route '/api/v1/webhooks/qris'
  */
     const qris3d980f8e9c18ecd027c46b716501cc9dForm = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -45,7 +45,7 @@ qris3d980f8e9c18ecd027c46b716501cc9d.post = (options?: RouteQueryOptions): Route
 
             /**
 * @see \App\Http\Controllers\Api\WebhookController::qris
- * @see app/Http/Controllers/Api/WebhookController.php:28
+ * @see app/Http/Controllers/Api/WebhookController.php:30
  * @route '/api/v1/webhooks/qris'
  */
         qris3d980f8e9c18ecd027c46b716501cc9dForm.post = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -56,7 +56,7 @@ qris3d980f8e9c18ecd027c46b716501cc9d.post = (options?: RouteQueryOptions): Route
     qris3d980f8e9c18ecd027c46b716501cc9d.form = qris3d980f8e9c18ecd027c46b716501cc9dForm
     /**
 * @see \App\Http\Controllers\Api\WebhookController::qris
- * @see app/Http/Controllers/Api/WebhookController.php:28
+ * @see app/Http/Controllers/Api/WebhookController.php:30
  * @route '/api/v1/webhooks/midtrans'
  */
 const qrisfcff4e49518f64e507a135c3c8b2123c = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -71,7 +71,7 @@ qrisfcff4e49518f64e507a135c3c8b2123c.definition = {
 
 /**
 * @see \App\Http\Controllers\Api\WebhookController::qris
- * @see app/Http/Controllers/Api/WebhookController.php:28
+ * @see app/Http/Controllers/Api/WebhookController.php:30
  * @route '/api/v1/webhooks/midtrans'
  */
 qrisfcff4e49518f64e507a135c3c8b2123c.url = (options?: RouteQueryOptions) => {
@@ -80,7 +80,7 @@ qrisfcff4e49518f64e507a135c3c8b2123c.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\Api\WebhookController::qris
- * @see app/Http/Controllers/Api/WebhookController.php:28
+ * @see app/Http/Controllers/Api/WebhookController.php:30
  * @route '/api/v1/webhooks/midtrans'
  */
 qrisfcff4e49518f64e507a135c3c8b2123c.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -90,7 +90,7 @@ qrisfcff4e49518f64e507a135c3c8b2123c.post = (options?: RouteQueryOptions): Route
 
     /**
 * @see \App\Http\Controllers\Api\WebhookController::qris
- * @see app/Http/Controllers/Api/WebhookController.php:28
+ * @see app/Http/Controllers/Api/WebhookController.php:30
  * @route '/api/v1/webhooks/midtrans'
  */
     const qrisfcff4e49518f64e507a135c3c8b2123cForm = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -100,7 +100,7 @@ qrisfcff4e49518f64e507a135c3c8b2123c.post = (options?: RouteQueryOptions): Route
 
             /**
 * @see \App\Http\Controllers\Api\WebhookController::qris
- * @see app/Http/Controllers/Api/WebhookController.php:28
+ * @see app/Http/Controllers/Api/WebhookController.php:30
  * @route '/api/v1/webhooks/midtrans'
  */
         qrisfcff4e49518f64e507a135c3c8b2123cForm.post = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({

@@ -2,8 +2,10 @@
 import { Link, usePage } from '@inertiajs/vue3';
 import {
     LayoutGrid,
+    MapPin,
     Package,
     Receipt,
+    ShieldCheck,
     Ticket,
 } from '@lucide/vue';
 import { computed } from 'vue';
@@ -27,12 +29,22 @@ const page = usePage();
 const isAdmin = computed(() => {
     const role = (page.props.auth?.user as { role?: string } | undefined)?.role;
 
-    return role === 'super_admin' || role === 'operator';
+    return (
+        role === 'super_admin' ||
+        role === 'operator' ||
+        role === 'kabupaten_admin'
+    );
+});
+
+const isSuperAdmin = computed(() => {
+    const role = (page.props.auth?.user as { role?: string } | undefined)?.role;
+
+    return role === 'super_admin';
 });
 
 const mainNavItems = computed<NavItem[]>(() => {
     if (isAdmin.value) {
-        return [
+        const items: NavItem[] = [
             {
                 title: 'Dashboard',
                 href: '/admin/dashboard',
@@ -54,6 +66,23 @@ const mainNavItems = computed<NavItem[]>(() => {
                 icon: Receipt,
             },
         ];
+
+        if (isSuperAdmin.value) {
+            items.push(
+                {
+                    title: 'Admin Wilayah',
+                    href: '/admin/admins',
+                    icon: ShieldCheck,
+                },
+                {
+                    title: 'Mapping Area',
+                    href: '/admin/areas',
+                    icon: MapPin,
+                },
+            );
+        }
+
+        return items;
     }
 
     return [

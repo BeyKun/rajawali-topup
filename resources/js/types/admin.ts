@@ -162,3 +162,23 @@ export type AdminRecentOrder = {
     redeem_status: RedeemStatus;
     created_at: string | null;
 };
+
+export type AdminAreaRow = {
+    id: number;
+    region: string;
+    city_id: number;
+    city_name: string | null;
+    province_id: number | null;
+    province_name: string | null;
+};
+
+export type AdminKabupatenAdminRow = {
+    id: number;
+    name: string;
+    email: string;
+    province_id: number | null;
+    province_name: string | null;
+    city_id: number | null;
+    city_name: string | null;
+    created_at: string | null;
+};

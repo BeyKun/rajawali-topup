@@ -5,7 +5,9 @@ namespace App\Services;
 use App\Enums\PaymentStatus;
 use App\Enums\RedeemStatus;
 use App\Enums\VoucherStatus;
+use App\Enums\WhatsAppEvent;
 use App\Exceptions\OutOfStockException;
+use App\Jobs\NotifyWhatsAppChannelJob;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
@@ -155,6 +157,8 @@ class OrderService
             $this->paymentGateway->cancelQrisInvoice($order->payment_ref_id);
         }
 
+        NotifyWhatsAppChannelJob::dispatchFor($order, WhatsAppEvent::Canceled);
+
         return $order;
     }
 
@@ -183,6 +187,8 @@ class OrderService
                 ]);
 
                 $this->releaseReservedVoucher($order->voucher_id);
+
+                NotifyWhatsAppChannelJob::dispatchFor($order, WhatsAppEvent::Expired);
 
                 $released++;
             }

@@ -39,6 +39,7 @@ class VoucherController extends Controller
 
         $vouchers = Voucher::query()
             ->with('product:id,name,sell_price')
+            ->forCity($request->user()?->isKabupatenAdmin() ? $request->user()->city_id : null)
             ->when($filters['status'], fn (Builder $query, string $status) => $query->where('status', $status))
             ->when($filters['search'], function (Builder $query, string $search): void {
                 $query->where(function (Builder $inner) use ($search): void {
@@ -64,7 +65,7 @@ class VoucherController extends Controller
         return Inertia::render('admin/vouchers/Index', [
             'vouchers' => $vouchers,
             'filters' => $filters,
-            'statusCounts' => $this->statusCounts(),
+            'statusCounts' => $this->statusCounts($request->user()?->isKabupatenAdmin() ? $request->user()->city_id : null),
         ]);
     }
 
@@ -189,9 +190,10 @@ class VoucherController extends Controller
      *
      * @return array<string, int>
      */
-    private function statusCounts(): array
+    private function statusCounts(?int $cityId = null): array
     {
         $raw = Voucher::query()
+            ->forCity($cityId)
             ->selectRaw('status, count(*) as total')
             ->groupBy('status')
             ->pluck('total', 'status');

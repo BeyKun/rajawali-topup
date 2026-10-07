@@ -1,5 +1,11 @@
 <?php
 
+use App\Models\City;
+use App\Models\District;
+use App\Models\OutletProfile;
+use App\Models\Province;
+use App\Models\User;
+use App\Models\Village;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -61,4 +67,29 @@ expect()->extend('toBeOne', function () {
 function something()
 {
     // ..
+}
+
+/**
+ * Attach a complete outlet profile to a customer so order endpoints are usable.
+ */
+function completeOutletProfile(User $user): OutletProfile
+{
+    static $counter = 0;
+    $counter++;
+
+    $province = Province::create(['code' => '11', 'name' => 'Aceh '.$counter]);
+    $city = City::create(['province_id' => $province->id, 'province_code' => '11', 'code' => '11.'.$counter, 'name' => 'Aceh Selatan '.$counter]);
+    $district = District::create(['city_id' => $city->id, 'city_code' => '11.'.$counter, 'code' => '11.'.$counter.'.01', 'name' => 'Bakongan '.$counter]);
+    $village = Village::create(['district_id' => $district->id, 'district_code' => '11.'.$counter.'.01', 'code' => '11.'.$counter.'.01.2001', 'name' => 'Keude '.$counter]);
+
+    return OutletProfile::create([
+        'user_id' => $user->id,
+        'outlet_name' => 'Konter '.$counter,
+        'whatsapp' => '08120000'.$counter,
+        'province_id' => $province->id,
+        'city_id' => $city->id,
+        'district_id' => $district->id,
+        'village_id' => $village->id,
+        'address' => 'Jl. Merdeka '.$counter,
+    ]);
 }

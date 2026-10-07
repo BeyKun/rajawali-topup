@@ -22,12 +22,18 @@ class ProductController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $cityId = $request->user('sanctum')?->city_id;
+
         $products = Product::query()
             ->with('category:id,name')
             ->withCount([
                 'vouchers as stock_count' => fn ($query) => $query->where('status', VoucherStatus::Available),
             ])
             ->where('is_active', true)
+            ->when($cityId !== null, fn ($query) => $query
+                ->where(fn ($inner) => $inner
+                    ->where('city_id', $cityId)
+                    ->orWhereNull('city_id')))
             ->orderBy('sort_order')
             ->orderBy('id')
             ->get()

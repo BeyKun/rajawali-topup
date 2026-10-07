@@ -17,6 +17,7 @@ beforeEach(function () {
     ]);
 
     $this->user = User::factory()->customer()->create();
+    completeOutletProfile($this->user);
 });
 
 /**

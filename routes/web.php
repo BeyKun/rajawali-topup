@@ -1,9 +1,11 @@
 <?php
 
-use App\Enums\UserRole;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\KabupatenAdminController;
 use App\Http\Controllers\Admin\OrderController;
 use App\Http\Controllers\Admin\ProductController;
+use App\Http\Controllers\Admin\RegionController;
+use App\Http\Controllers\Admin\TelkomselAreaController;
 use App\Http\Controllers\Admin\VoucherController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -17,7 +19,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', function (Request $request) {
         $user = $request->user();
 
-        if ($user !== null && in_array($user->role, [UserRole::SuperAdmin, UserRole::Operator], true)) {
+        if ($user !== null && $user->isAdminDashboardUser()) {
             return to_route('admin.dashboard');
         }
 
@@ -47,6 +49,25 @@ Route::middleware(['auth', 'verified', 'admin'])
         Route::post('orders/{order}/retry-redeem', [OrderController::class, 'retryRedeem'])->name('orders.retry-redeem');
         Route::post('orders/{order}/cancel', [OrderController::class, 'cancel'])->name('orders.cancel');
         Route::post('orders/{order}/mark-refunded', [OrderController::class, 'markRefunded'])->name('orders.mark-refunded');
+
+        Route::prefix('api/regions')->name('regions.')->group(function (): void {
+            Route::get('provinces', [RegionController::class, 'provinces'])->name('provinces');
+            Route::get('cities', [RegionController::class, 'cities'])->name('cities');
+            Route::get('districts', [RegionController::class, 'districts'])->name('districts');
+            Route::get('villages', [RegionController::class, 'villages'])->name('villages');
+        });
+
+        Route::middleware('super_admin')->group(function (): void {
+            Route::get('admins', [KabupatenAdminController::class, 'index'])->name('admins.index');
+            Route::post('admins', [KabupatenAdminController::class, 'store'])->name('admins.store');
+            Route::put('admins/{admin}', [KabupatenAdminController::class, 'update'])->name('admins.update');
+            Route::delete('admins/{admin}', [KabupatenAdminController::class, 'destroy'])->name('admins.destroy');
+
+            Route::get('areas', [TelkomselAreaController::class, 'index'])->name('areas.index');
+            Route::post('areas', [TelkomselAreaController::class, 'store'])->name('areas.store');
+            Route::put('areas/{area}', [TelkomselAreaController::class, 'update'])->name('areas.update');
+            Route::delete('areas/{area}', [TelkomselAreaController::class, 'destroy'])->name('areas.destroy');
+        });
     });
 
 require __DIR__.'/settings.php';

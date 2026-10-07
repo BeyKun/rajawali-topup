@@ -66,6 +66,8 @@ test('a physical voucher flows from admin intake to telkomsel redemption end to 
     $token = (string) $auth->json('token');
     $customerId = (int) $auth->json('user.id');
 
+    completeOutletProfile(User::query()->findOrFail($customerId));
+
     expect($token)->not->toBeEmpty()
         ->and(User::query()->findOrFail($customerId)->role)->toBe(UserRole::Customer);
 

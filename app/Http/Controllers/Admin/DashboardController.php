@@ -10,6 +10,7 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\Voucher;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -28,31 +29,33 @@ class DashboardController extends Controller
     /**
      * Show the admin analytics dashboard.
      */
-    public function index(): Response
+    public function index(Request $request): Response
     {
+        $cityId = $request->user()?->isKabupatenAdmin() ? $request->user()->city_id : null;
         $today = Carbon::today();
         $startOfMonth = Carbon::now()->startOfMonth();
 
-        $revenueToday = $this->paidOrders()->where('paid_at', '>=', $today)->sum('total_amount');
-        $revenueThisMonth = $this->paidOrders()->where('paid_at', '>=', $startOfMonth)->sum('total_amount');
+        $revenueToday = $this->paidOrders($cityId)->where('paid_at', '>=', $today)->sum('total_amount');
+        $revenueThisMonth = $this->paidOrders($cityId)->where('paid_at', '>=', $startOfMonth)->sum('total_amount');
 
         return Inertia::render('admin/Dashboard', [
             'stats' => [
-                'total_orders' => Order::query()->count(),
-                'orders_today' => Order::query()->where('created_at', '>=', $today)->count(),
+                'total_orders' => Order::query()->forCity($cityId)->count(),
+                'orders_today' => Order::query()->forCity($cityId)->where('created_at', '>=', $today)->count(),
                 'revenue_today' => (float) $revenueToday,
                 'revenue_this_month' => (float) $revenueThisMonth,
-                'available_vouchers' => Voucher::query()->where('status', VoucherStatus::Available)->count(),
-                'redeemed_vouchers' => Voucher::query()->where('status', VoucherStatus::Redeemed)->count(),
+                'available_vouchers' => Voucher::query()->forCity($cityId)->where('status', VoucherStatus::Available)->count(),
+                'redeemed_vouchers' => Voucher::query()->forCity($cityId)->where('status', VoucherStatus::Redeemed)->count(),
                 'failed_orders' => Order::query()
+                    ->forCity($cityId)
                     ->where(fn (Builder $query) => $query
                         ->where('redeem_status', RedeemStatus::Failed)
                         ->orWhere('payment_status', PaymentStatus::Failed))
                     ->count(),
             ],
-            'salesChart' => $this->salesChart(),
-            'lowStock' => $this->lowStock(),
-            'recentOrders' => $this->recentOrders(),
+            'salesChart' => $this->salesChart($cityId),
+            'lowStock' => $this->lowStock($cityId),
+            'recentOrders' => $this->recentOrders($cityId),
         ]);
     }
 
@@ -64,12 +67,14 @@ class DashboardController extends Controller
      *
      * @return Builder<Order>
      */
-    private function paidOrders(): Builder
+    private function paidOrders(?int $cityId = null): Builder
     {
-        return Order::query()->where(function (Builder $query): void {
-            $query->where('payment_status', PaymentStatus::Paid)
-                ->orWhere('redeem_status', RedeemStatus::Success);
-        });
+        return Order::query()
+            ->forCity($cityId)
+            ->where(function (Builder $query): void {
+                $query->where('payment_status', PaymentStatus::Paid)
+                    ->orWhere('redeem_status', RedeemStatus::Success);
+            });
     }
 
     /**
@@ -77,17 +82,18 @@ class DashboardController extends Controller
      *
      * @return array<int, array{date: string, revenue: float, orders: int}>
      */
-    private function salesChart(): array
+    private function salesChart(?int $cityId = null): array
     {
         $start = Carbon::today()->subDays(self::SALES_CHART_DAYS - 1);
 
-        $revenueByDate = $this->paidOrders()
+        $revenueByDate = $this->paidOrders($cityId)
             ->where('paid_at', '>=', $start)
             ->get(['paid_at', 'total_amount'])
             ->groupBy(fn (Order $order): string => $order->paid_at?->toDateString() ?? '')
             ->map(fn ($orders): float => (float) $orders->sum('total_amount'));
 
         $ordersByDate = Order::query()
+            ->forCity($cityId)
             ->where('created_at', '>=', $start)
             ->get(['created_at'])
             ->groupBy(fn (Order $order): string => $order->created_at?->toDateString() ?? '')
@@ -113,13 +119,15 @@ class DashboardController extends Controller
      *
      * @return array<int, array{id: int, name: string, available_stock: int}>
      */
-    private function lowStock(): array
+    private function lowStock(?int $cityId = null): array
     {
         return Product::query()
+            ->forCity($cityId)
             ->where('is_active', true)
             ->withCount([
                 'vouchers as available_stock' => fn (Builder $query) => $query
-                    ->where('status', VoucherStatus::Available),
+                    ->where('status', VoucherStatus::Available)
+                    ->when($cityId, fn (Builder $q) => $q->where('city_id', $cityId)),
             ])
             ->orderBy('available_stock')
             ->get()
@@ -138,9 +146,10 @@ class DashboardController extends Controller
      *
      * @return array<int, array<string, mixed>>
      */
-    private function recentOrders(): array
+    private function recentOrders(?int $cityId = null): array
     {
         return Order::query()
+            ->forCity($cityId)
             ->with(['product:id,name'])
             ->latest('created_at')
             ->limit(self::RECENT_ORDERS_LIMIT)

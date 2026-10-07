@@ -29,15 +29,20 @@ class AdminUserSeeder extends Seeder
         ];
 
         foreach ($accounts as $account) {
-            User::updateOrCreate(
-                ['email' => $account['email']],
-                [
-                    'name' => $account['name'],
-                    'password' => $account['password'],
-                    'role' => $account['role'],
-                    'email_verified_at' => now(),
-                ],
-            );
+            $user = User::query()->firstOrNew(['email' => $account['email']]);
+
+            $user->name = $account['name'];
+            $user->role = $account['role'];
+            $user->email_verified_at = $user->email_verified_at ?? now();
+
+            // Only set the password when the account is created. Re-running the
+            // seeder must never silently reset a password that was changed by
+            // the operator, which would lock them out of the dashboard.
+            if (! $user->exists) {
+                $user->password = $account['password'];
+            }
+
+            $user->save();
         }
     }
 }

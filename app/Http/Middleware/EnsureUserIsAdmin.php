@@ -25,7 +25,7 @@ class EnsureUserIsAdmin
     {
         $user = $request->user();
 
-        $allowedRoles = [UserRole::SuperAdmin, UserRole::Operator];
+        $allowedRoles = [UserRole::SuperAdmin, UserRole::Operator, UserRole::KabupatenAdmin];
 
         if ($user === null || ! in_array($user->role, $allowedRoles, true)) {
             abort(403, 'Anda tidak memiliki akses ke halaman admin.');

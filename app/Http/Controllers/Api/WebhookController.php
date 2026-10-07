@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Enums\PaymentStatus;
+use App\Enums\WhatsAppEvent;
 use App\Http\Controllers\Controller;
+use App\Jobs\NotifyWhatsAppChannelJob;
 use App\Jobs\ProcessVoucherRedeemJob;
 use App\Models\Order;
 use App\Services\PaymentGatewayService;
@@ -77,6 +79,7 @@ class WebhookController extends Controller
         ]);
 
         ProcessVoucherRedeemJob::dispatch($order);
+        NotifyWhatsAppChannelJob::dispatchFor($order, WhatsAppEvent::Paid);
     }
 
     /**
