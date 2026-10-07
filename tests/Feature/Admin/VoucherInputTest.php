@@ -175,3 +175,78 @@ test('an available voucher can be deleted but a redeemed one cannot', function (
 
     $this->assertDatabaseHas('vouchers', ['id' => $redeemed->id]);
 });
+
+test('super admin sees is_super_admin and cities props on create page', function () {
+    $province = \App\Models\Province::create(['code' => '32', 'name' => 'Jawa Barat']);
+    $city = \App\Models\City::create(['province_id' => $province->id, 'province_code' => '32', 'code' => '32.01', 'name' => 'Bogor']);
+
+    $this->actingAs($this->admin)
+        ->get('/admin/vouchers/create')
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('admin/vouchers/Create')
+            ->where('is_super_admin', true)
+            ->has('cities', 1)
+        );
+});
+
+test('super admin can assign multiple cities to a voucher', function () {
+    $province = \App\Models\Province::create(['code' => '11', 'name' => 'Aceh']);
+    $cityA = \App\Models\City::create(['province_id' => $province->id, 'province_code' => '11', 'code' => '11.01', 'name' => 'Aceh Selatan']);
+    $cityB = \App\Models\City::create(['province_id' => $province->id, 'province_code' => '11', 'code' => '11.02', 'name' => 'Aceh Singkil']);
+    $cityC = \App\Models\City::create(['province_id' => $province->id, 'province_code' => '11', 'code' => '11.03', 'name' => 'Aceh Barat']);
+
+    $serial = '300338120354';
+    $hrn = '71125613431848001';
+
+    $this->actingAs($this->admin)
+        ->post('/admin/vouchers', [
+            'serial_number' => $serial,
+            'hrn' => $hrn,
+            'sell_price' => 25000,
+            'city_ids' => [$cityA->id, $cityB->id],
+        ])
+        ->assertRedirect('/admin/vouchers');
+
+    $voucher = Voucher::query()->where('serial_number', $serial)->sole();
+
+    expect($voucher->cities()->count())->toBe(2)
+        ->and($voucher->cities->pluck('id')->all())->toEqualCanonicalizing([$cityA->id, $cityB->id]);
+
+    // Available for city A and city B, but not city C
+    expect(Voucher::query()->forCity($cityA->id)->count())->toBe(1)
+        ->and(Voucher::query()->forCity($cityB->id)->count())->toBe(1)
+        ->and(Voucher::query()->forCity($cityC->id)->count())->toBe(0);
+});
+
+test('voucher input applies margin percentage to calculate final mobile sell price and preserves hpp price', function () {
+    $serial = '300338120354';
+    $hrn = '71125613431848001';
+
+    $this->actingAs($this->admin)
+        ->post('/admin/vouchers', [
+            'serial_number' => $serial,
+            'hrn' => $hrn,
+            'sell_price' => 10000,
+            'margin_percentage' => 2,
+        ])
+        ->assertRedirect('/admin/vouchers');
+
+    $voucher = Voucher::query()->where('serial_number', $serial)->sole();
+    $product = Product::query()->findOrFail($voucher->product_id);
+
+    // Base price becomes hpp_price (10,000) and final sell_price becomes 10,200 (+2%)
+    expect((float) $product->hpp_price)->toBe(10000.0)
+        ->and((float) $product->sell_price)->toBe(10200.0);
+});
+
+test('negative margin percentage is rejected by validation', function () {
+    $this->actingAs($this->admin)
+        ->post('/admin/vouchers', [
+            'serial_number' => '300338120354',
+            'hrn' => '71125613431848001',
+            'sell_price' => 10000,
+            'margin_percentage' => -5,
+        ])
+        ->assertSessionHasErrors('margin_percentage');
+});

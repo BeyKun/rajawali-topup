@@ -25,8 +25,14 @@ class ValidateVoucherBatchJob implements ShouldQueue
 
     /**
      * @param  array<int, array{serial_number: string, hrn: string, sell_price: float}>  $rows
+     * @param  array<int, int>  $cityIds
      */
-    public function __construct(public array $rows, public ?int $adminId = null) {}
+    public function __construct(
+        public array $rows,
+        public ?int $adminId = null,
+        public array $cityIds = [],
+        public ?float $marginPercentage = null,
+    ) {}
 
     public function handle(VoucherInventoryService $inventory): void
     {
@@ -36,11 +42,18 @@ class ValidateVoucherBatchJob implements ShouldQueue
 
         foreach ($this->rows as $index => $row) {
             try {
+                $basePrice = (float) $row['sell_price'];
+                $sellPrice = $this->marginPercentage !== null && $this->marginPercentage > 0
+                    ? (float) round($basePrice * (1 + ($this->marginPercentage / 100)))
+                    : $basePrice;
+
                 $inventory->addVoucher(
                     $row['serial_number'],
                     $row['hrn'],
-                    $row['sell_price'],
+                    $sellPrice,
                     $this->adminId,
+                    $this->cityIds,
+                    hppPrice: $basePrice,
                 );
 
                 $stored++;

@@ -67,3 +67,45 @@ test('bulk import requires a file', function () {
         ->post('/admin/vouchers/bulk', [])
         ->assertSessionHasErrors('file');
 });
+
+test('super admin sees is_super_admin and cities props on bulk page', function () {
+    $province = \App\Models\Province::create(['code' => '32', 'name' => 'Jawa Barat']);
+    $city = \App\Models\City::create(['province_id' => $province->id, 'province_code' => '32', 'code' => '32.01', 'name' => 'Bogor']);
+
+    $this->actingAs($this->admin)
+        ->get('/admin/vouchers/bulk')
+        ->assertOk()
+        ->assertInertia(fn (\Inertia\Testing\AssertableInertia $page) => $page
+            ->component('admin/vouchers/Bulk')
+            ->where('is_super_admin', true)
+            ->has('cities', 1)
+        );
+});
+
+test('super admin bulk import applies multiple cities to all imported vouchers', function () {
+    $province = \App\Models\Province::create(['code' => '11', 'name' => 'Aceh']);
+    $cityA = \App\Models\City::create(['province_id' => $province->id, 'province_code' => '11', 'code' => '11.01', 'name' => 'Aceh Selatan']);
+    $cityB = \App\Models\City::create(['province_id' => $province->id, 'province_code' => '11', 'code' => '11.02', 'name' => 'Aceh Singkil']);
+
+    $content = implode("\n", [
+        'serial_number,hrn,sell_price',
+        '300338120354,71125613431848001,25000',
+        '300338120355,71125613431848002,25000',
+    ]);
+
+    $file = UploadedFile::fake()->createWithContent('vouchers.csv', $content);
+
+    $this->actingAs($this->admin)
+        ->post('/admin/vouchers/bulk', [
+            'file' => $file,
+            'city_ids' => [$cityA->id, $cityB->id],
+        ])
+        ->assertRedirect('/admin/vouchers');
+
+    expect(Voucher::query()->count())->toBe(2);
+
+    $vouchers = Voucher::with('cities')->get();
+    foreach ($vouchers as $voucher) {
+        expect($voucher->cities->pluck('id')->all())->toEqualCanonicalizing([$cityA->id, $cityB->id]);
+    }
+});

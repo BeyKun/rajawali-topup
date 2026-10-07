@@ -6,6 +6,7 @@ use App\Enums\VoucherStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\VoucherCheckRequest;
 use App\Http\Requests\Admin\VoucherRequest;
+use App\Http\Requests\Admin\VoucherUpdateRequest;
 use App\Jobs\ValidateVoucherBatchJob;
 use App\Models\Voucher;
 use App\Services\TelkomselVoucherService;
@@ -37,8 +38,22 @@ class VoucherController extends Controller
             'search' => $request->string('search')->toString() ?: null,
         ];
 
+        $isSuperAdmin = (bool) $request->user()?->isSuperAdmin();
+        $cities = $isSuperAdmin
+            ? \App\Models\City::query()
+                ->with('province:id,name')
+                ->orderBy('name')
+                ->get()
+                ->map(fn (\App\Models\City $c): array => [
+                    'id' => $c->id,
+                    'name' => $c->name,
+                    'province_name' => $c->province?->name,
+                ])
+                ->all()
+            : [];
+
         $vouchers = Voucher::query()
-            ->with('product:id,name,sell_price')
+            ->with(['product:id,name,sell_price,hpp_price', 'cities:id'])
             ->forCity($request->user()?->isKabupatenAdmin() ? $request->user()->city_id : null)
             ->when($filters['status'], fn (Builder $query, string $status) => $query->where('status', $status))
             ->when($filters['search'], function (Builder $query, string $search): void {
@@ -55,6 +70,11 @@ class VoucherController extends Controller
                 'serial_number' => $voucher->serial_number,
                 'product_name' => $voucher->product?->name,
                 'sell_price' => $voucher->product !== null ? (float) $voucher->product->sell_price : null,
+                'hpp_price' => $voucher->product !== null ? (float) $voucher->product->hpp_price : null,
+                'margin_percentage' => ($voucher->product !== null && (float) $voucher->product->hpp_price > 0)
+                    ? (float) round((((float) $voucher->product->sell_price - (float) $voucher->product->hpp_price) / (float) $voucher->product->hpp_price) * 100, 2)
+                    : 0.0,
+                'city_ids' => $voucher->cities->pluck('id')->all() ?: ($voucher->city_id ? [$voucher->city_id] : []),
                 'status' => $voucher->status->value,
                 'region' => $voucher->region,
                 'expired_date' => $voucher->expired_date,
@@ -66,15 +86,34 @@ class VoucherController extends Controller
             'vouchers' => $vouchers,
             'filters' => $filters,
             'statusCounts' => $this->statusCounts($request->user()?->isKabupatenAdmin() ? $request->user()->city_id : null),
+            'is_super_admin' => $isSuperAdmin,
+            'cities' => $cities,
         ]);
     }
 
     /**
      * Show the single voucher input form.
      */
-    public function create(): Response
+    public function create(Request $request): Response
     {
-        return Inertia::render('admin/vouchers/Create');
+        $isSuperAdmin = (bool) $request->user()?->isSuperAdmin();
+        $cities = $isSuperAdmin
+            ? \App\Models\City::query()
+                ->with('province:id,name')
+                ->orderBy('name')
+                ->get()
+                ->map(fn (\App\Models\City $c): array => [
+                    'id' => $c->id,
+                    'name' => $c->name,
+                    'province_name' => $c->province?->name,
+                ])
+                ->all()
+            : [];
+
+        return Inertia::render('admin/vouchers/Create', [
+            'is_super_admin' => $isSuperAdmin,
+            'cities' => $cities,
+        ]);
     }
 
     /**
@@ -104,12 +143,27 @@ class VoucherController extends Controller
      */
     public function store(VoucherRequest $request): RedirectResponse
     {
+        $cityIds = $request->user()?->isSuperAdmin()
+            ? (array) $request->input('city_ids', [])
+            : ($request->user()?->city_id ? [$request->user()->city_id] : []);
+
+        $basePrice = (float) $request->float('sell_price');
+        $marginPercentage = $request->filled('margin_percentage')
+            ? (float) $request->float('margin_percentage')
+            : 0.0;
+
+        $finalSellPrice = $marginPercentage > 0
+            ? (float) round($basePrice * (1 + ($marginPercentage / 100)))
+            : $basePrice;
+
         try {
             $voucher = $this->inventory->addVoucher(
                 $request->string('serial_number')->toString(),
                 $request->string('hrn')->toString(),
-                (float) $request->float('sell_price'),
+                $finalSellPrice,
                 $request->user()?->id,
+                $cityIds,
+                hppPrice: $basePrice,
             );
         } catch (ValidationException $exception) {
             return back()->withErrors($exception->errors())->withInput();
@@ -118,6 +172,55 @@ class VoucherController extends Controller
         Inertia::flash('toast', [
             'type' => 'success',
             'message' => "Voucher {$voucher->serial_number} berhasil ditambahkan ke inventori.",
+        ]);
+
+        return to_route('admin.vouchers.index');
+    }
+
+    /**
+     * Update an existing voucher.
+     */
+    public function update(VoucherUpdateRequest $request, Voucher $voucher): RedirectResponse
+    {
+        if ($request->user()?->isKabupatenAdmin()) {
+            $userCityId = $request->user()->city_id;
+            $hasAccess = $voucher->city_id === $userCityId || $voucher->cities()->where('cities.id', $userCityId)->exists();
+            abort_unless($hasAccess, 403, 'Anda tidak berhak mengubah voucher di luar wilayah Anda.');
+        }
+
+        $basePrice = (float) $request->float('sell_price');
+        $marginPercentage = $request->filled('margin_percentage')
+            ? (float) $request->float('margin_percentage')
+            : 0.0;
+
+        $finalSellPrice = $marginPercentage > 0
+            ? (float) round($basePrice * (1 + ($marginPercentage / 100)))
+            : $basePrice;
+
+        $voucher->serial_number = $request->string('serial_number')->toString();
+        if ($request->filled('hrn')) {
+            $voucher->hrn = $request->string('hrn')->toString();
+        }
+        $voucher->status = VoucherStatus::from($request->string('status')->toString());
+
+        if ($request->user()?->isSuperAdmin()) {
+            $cityIds = array_values(array_unique(array_filter(array_map('intval', (array) $request->input('city_ids', [])))));
+            $voucher->cities()->sync($cityIds);
+            $voucher->city_id = count($cityIds) === 1 ? $cityIds[0] : null;
+        }
+
+        $voucher->save();
+
+        if ($voucher->product !== null) {
+            $voucher->product->update([
+                'sell_price' => $finalSellPrice,
+                'hpp_price' => $basePrice,
+            ]);
+        }
+
+        Inertia::flash('toast', [
+            'type' => 'success',
+            'message' => "Voucher {$voucher->serial_number} berhasil diperbarui.",
         ]);
 
         return to_route('admin.vouchers.index');
@@ -142,9 +245,26 @@ class VoucherController extends Controller
     /**
      * Show the bulk import form.
      */
-    public function bulk(): Response
+    public function bulk(Request $request): Response
     {
-        return Inertia::render('admin/vouchers/Bulk');
+        $isSuperAdmin = (bool) $request->user()?->isSuperAdmin();
+        $cities = $isSuperAdmin
+            ? \App\Models\City::query()
+                ->with('province:id,name')
+                ->orderBy('name')
+                ->get()
+                ->map(fn (\App\Models\City $c): array => [
+                    'id' => $c->id,
+                    'name' => $c->name,
+                    'province_name' => $c->province?->name,
+                ])
+                ->all()
+            : [];
+
+        return Inertia::render('admin/vouchers/Bulk', [
+            'is_super_admin' => $isSuperAdmin,
+            'cities' => $cities,
+        ]);
     }
 
     /**
@@ -152,9 +272,25 @@ class VoucherController extends Controller
      */
     public function bulkStore(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
+        $rules = [
             'file' => ['required', 'file', 'mimes:csv,txt', 'max:5120'],
-        ]);
+            'margin_percentage' => ['nullable', 'numeric', 'min:0'],
+        ];
+
+        if ($request->user()?->isSuperAdmin()) {
+            $rules['city_ids'] = ['nullable', 'array'];
+            $rules['city_ids.*'] = ['integer', 'exists:cities,id'];
+        }
+
+        $validated = $request->validate($rules);
+
+        $cityIds = $request->user()?->isSuperAdmin()
+            ? (array) ($validated['city_ids'] ?? [])
+            : ($request->user()?->city_id ? [$request->user()->city_id] : []);
+
+        $marginPercentage = $request->filled('margin_percentage')
+            ? (float) $request->float('margin_percentage')
+            : null;
 
         try {
             $rows = $this->parseCsv($request->file('file')->getRealPath());
@@ -175,7 +311,7 @@ class VoucherController extends Controller
             $request->file('file')->getContent() ?? '',
         );
 
-        ValidateVoucherBatchJob::dispatch($rows, $request->user()?->id);
+        ValidateVoucherBatchJob::dispatch($rows, $request->user()?->id, $cityIds, $marginPercentage);
 
         Inertia::flash('toast', [
             'type' => 'success',

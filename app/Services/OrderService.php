@@ -57,6 +57,7 @@ class OrderService
             $voucher = Voucher::query()
                 ->where('product_id', $productId)
                 ->where('status', VoucherStatus::Available)
+                ->when($user->city_id, fn ($q) => $q->forCity($user->city_id))
                 ->lockForUpdate()
                 ->first();
 

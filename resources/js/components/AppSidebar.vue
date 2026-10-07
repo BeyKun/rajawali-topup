@@ -2,7 +2,6 @@
 import { Link, usePage } from '@inertiajs/vue3';
 import {
     LayoutGrid,
-    MapPin,
     Package,
     Receipt,
     ShieldCheck,
@@ -68,18 +67,11 @@ const mainNavItems = computed<NavItem[]>(() => {
         ];
 
         if (isSuperAdmin.value) {
-            items.push(
-                {
-                    title: 'Admin Wilayah',
-                    href: '/admin/admins',
-                    icon: ShieldCheck,
-                },
-                {
-                    title: 'Mapping Area',
-                    href: '/admin/areas',
-                    icon: MapPin,
-                },
-            );
+            items.push({
+                title: 'Admin Wilayah',
+                href: '/admin/admins',
+                icon: ShieldCheck,
+            });
         }
 
         return items;

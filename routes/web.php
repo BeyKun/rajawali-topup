@@ -40,6 +40,7 @@ Route::middleware(['auth', 'verified', 'admin'])
         Route::get('vouchers/create', [VoucherController::class, 'create'])->name('vouchers.create');
         Route::post('vouchers/check', [VoucherController::class, 'check'])->name('vouchers.check');
         Route::post('vouchers', [VoucherController::class, 'store'])->name('vouchers.store');
+        Route::put('vouchers/{voucher}', [VoucherController::class, 'update'])->name('vouchers.update');
         Route::delete('vouchers/{voucher}', [VoucherController::class, 'destroy'])->name('vouchers.destroy');
         Route::get('vouchers/bulk', [VoucherController::class, 'bulk'])->name('vouchers.bulk');
         Route::post('vouchers/bulk', [VoucherController::class, 'bulkStore'])->name('vouchers.bulk.store');

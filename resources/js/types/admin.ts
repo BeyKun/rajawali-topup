@@ -27,6 +27,9 @@ export type AdminVoucher = {
     serial_number: string;
     product_name: string | null;
     sell_price: number | null;
+    hpp_price?: number | null;
+    margin_percentage?: number | null;
+    city_ids?: number[];
     status: VoucherStatus;
     region: string | null;
     expired_date: string | null;

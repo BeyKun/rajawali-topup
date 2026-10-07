@@ -39,8 +39,14 @@ class VoucherInventoryService
      *
      * @throws ValidationException When the voucher is invalid, already used or duplicated.
      */
-    public function addVoucher(string $serialNumber, string $hrn, ?float $sellPrice = null, ?int $adminId = null): Voucher
-    {
+    public function addVoucher(
+        string $serialNumber,
+        string $hrn,
+        ?float $sellPrice = null,
+        ?int $adminId = null,
+        array $cityIds = [],
+        ?float $hppPrice = null,
+    ): Voucher {
         $serialNumber = trim($serialNumber);
         $hrn = trim($hrn);
 
@@ -62,12 +68,22 @@ class VoucherInventoryService
             ]);
         }
 
-        return DB::transaction(function () use ($check, $serialNumber, $hrn, $sellPrice, $adminId): Voucher {
-            $cityId = $this->resolveCityId($check['region'], $adminId);
+        return DB::transaction(function () use ($check, $serialNumber, $hrn, $sellPrice, $adminId, $cityIds, $hppPrice): Voucher {
+            $effectiveCityIds = array_values(array_unique(array_filter(array_map('intval', $cityIds))));
 
-            $product = $this->resolveProduct($check, $sellPrice, $cityId);
+            if (empty($effectiveCityIds)) {
+                $fallbackCity = $this->resolveCityId($check['region'], $adminId);
+                if ($fallbackCity !== null) {
+                    $effectiveCityIds = [$fallbackCity];
+                }
+            }
 
-            return Voucher::query()->create([
+            $primaryCityId = count($effectiveCityIds) === 1 ? $effectiveCityIds[0] : null;
+            $productCityId = count($effectiveCityIds) === 1 ? $effectiveCityIds[0] : null;
+
+            $product = $this->resolveProduct($check, $sellPrice, $productCityId, $hppPrice);
+
+            $voucher = Voucher::query()->create([
                 'product_id' => $product->id,
                 'serial_number' => $check['serial_number'] !== '' ? $check['serial_number'] : $serialNumber,
                 'hrn' => $hrn,
@@ -75,10 +91,16 @@ class VoucherInventoryService
                 'validity' => $check['validity'] !== '' ? $check['validity'] : null,
                 'expired_date' => $check['expired_date'] !== '' ? $check['expired_date'] : null,
                 'region' => $check['region'] !== '' ? $check['region'] : null,
-                'city_id' => $cityId,
+                'city_id' => $primaryCityId,
                 'telkomsel_check_response' => $check['raw'],
                 'created_by' => $adminId,
             ]);
+
+            if (!empty($effectiveCityIds)) {
+                $voucher->cities()->sync($effectiveCityIds);
+            }
+
+            return $voucher;
         });
     }
 
@@ -107,8 +129,12 @@ class VoucherInventoryService
      *
      * @param  array{name: string, description: string, validity: string, region: string}  $check
      */
-    protected function resolveProduct(array $check, ?float $sellPrice, ?int $cityId = null): Product
-    {
+    protected function resolveProduct(
+        array $check,
+        ?float $sellPrice,
+        ?int $cityId = null,
+        ?float $hppPrice = null,
+    ): Product {
         $name = $this->deriveProductName($check);
         $slug = $this->deriveProductSlug($name, $check, $cityId);
 
@@ -118,7 +144,12 @@ class VoucherInventoryService
         $product->quota_description = $check['description'] !== '' ? $check['description'] : $name;
         $product->validity_days = $this->parseValidityDays($check['validity']);
         $product->region = $check['region'] !== '' ? $check['region'] : null;
-        $product->hpp_price = $product->hpp_price ?? 0;
+
+        if ($hppPrice !== null) {
+            $product->hpp_price = $hppPrice;
+        } else {
+            $product->hpp_price = $product->hpp_price ?? 0;
+        }
 
         if ($cityId !== null) {
             $product->city_id = $cityId;
@@ -176,9 +207,14 @@ class VoucherInventoryService
      */
     protected function deriveProductName(array $check): string
     {
-        $name = trim($check['name']) !== '' ? trim($check['name']) : 'Paket Telkomsel';
+        $description = trim($check['description'] ?? '');
+        if ($description !== '') {
+            return Str::limit($description, 255, '');
+        }
 
-        if ($check['validity'] !== '') {
+        $name = trim($check['name'] ?? '') !== '' ? trim($check['name']) : 'Paket Telkomsel';
+
+        if (($check['validity'] ?? '') !== '') {
             $name .= " {$check['validity']} Hari";
         }
 

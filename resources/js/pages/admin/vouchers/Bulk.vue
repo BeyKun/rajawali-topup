@@ -3,6 +3,9 @@ import { useForm } from '@inertiajs/vue3';
 import { ArrowLeft, Download, FileUp, UploadCloud } from '@lucide/vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
+import SearchableCityMultiSelect, {
+    type CityOption,
+} from '@/components/SearchableCityMultiSelect.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,8 +20,14 @@ defineOptions({
     },
 });
 
-const form = useForm<{ file: File | null }>({
+const props = defineProps<{
+    is_super_admin?: boolean;
+    cities?: CityOption[];
+}>();
+
+const form = useForm<{ file: File | null; city_ids: number[] }>({
     file: null,
+    city_ids: [],
 });
 
 function onFileChange(event: Event): void {
@@ -72,6 +81,19 @@ function downloadTemplate(): void {
                         @change="onFileChange"
                     />
                     <InputError :message="form.errors.file" />
+                </div>
+
+                <div v-if="props.is_super_admin" class="grid gap-2">
+                    <Label>Wilayah Berlaku</Label>
+                    <SearchableCityMultiSelect
+                        v-model="form.city_ids"
+                        :cities="props.cities || []"
+                        placeholder="Pilih satu atau beberapa wilayah untuk seluruh batch..."
+                    />
+                    <InputError :message="form.errors.city_ids" />
+                    <p class="text-xs text-muted-foreground">
+                        Wilayah yang dipilih akan diterapkan ke seluruh voucher yang diimpor dari file CSV ini.
+                    </p>
                 </div>
 
                 <div class="flex items-center gap-3">

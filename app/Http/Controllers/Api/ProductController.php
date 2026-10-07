@@ -27,7 +27,16 @@ class ProductController extends Controller
         $products = Product::query()
             ->with('category:id,name')
             ->withCount([
-                'vouchers as stock_count' => fn ($query) => $query->where('status', VoucherStatus::Available),
+                'vouchers as stock_count' => fn ($query) => $query
+                    ->where('status', VoucherStatus::Available)
+                    ->when($cityId !== null, fn ($q) => $q->where(fn ($inner) => $inner
+                        ->where('vouchers.city_id', $cityId)
+                        ->orWhereHas('cities', fn ($cq) => $cq->where('cities.id', $cityId))
+                        ->orWhere(fn ($unscoped) => $unscoped
+                            ->whereNull('vouchers.city_id')
+                            ->whereDoesntHave('cities')
+                        )
+                    )),
             ])
             ->where('is_active', true)
             ->when($cityId !== null, fn ($query) => $query

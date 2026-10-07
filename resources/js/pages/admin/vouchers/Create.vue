@@ -6,9 +6,12 @@ import {
     CheckCircle2,
     ScanSearch,
 } from '@lucide/vue';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
+import SearchableCityMultiSelect, {
+    type CityOption,
+} from '@/components/SearchableCityMultiSelect.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -25,10 +28,44 @@ defineOptions({
     },
 });
 
+const props = defineProps<{
+    is_super_admin?: boolean;
+    cities?: CityOption[];
+}>();
+
 const form = useForm({
     serial_number: '',
     hrn: '',
     sell_price: '',
+    margin_percentage: '2',
+    city_ids: [] as number[],
+});
+
+const calculatedFinalPrice = computed(() => {
+    const base = Math.max(0, parseFloat(String(form.sell_price)) || 0);
+    const margin = Math.max(0, parseFloat(String(form.margin_percentage)) || 0);
+    return Math.round(base * (1 + margin / 100));
+});
+
+function onMarginInput(event: Event): void {
+    const target = event.target as HTMLInputElement;
+    let val = target.value;
+    if (val.includes('-')) {
+        val = val.replace(/-/g, '');
+        form.margin_percentage = val;
+    }
+    if (parseFloat(val) < 0) {
+        form.margin_percentage = '0';
+    }
+}
+
+const formattedFinalPrice = computed(() => {
+    return new Intl.NumberFormat('id-ID', {
+        style: 'currency',
+        currency: 'IDR',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+    }).format(calculatedFinalPrice.value);
 });
 
 const checkRequest = useHttp<{ serial_number: string }, VoucherCheckResult>({
@@ -124,18 +161,60 @@ function submit(): void {
                     </p>
                 </div>
 
-                <div class="grid gap-2">
-                    <Label for="sell_price">Harga Jual (Rp)</Label>
-                    <Input
-                        id="sell_price"
-                        v-model="form.sell_price"
-                        inputmode="numeric"
-                        placeholder="25000"
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div class="grid gap-2">
+                        <Label for="sell_price">Harga (Rp)</Label>
+                        <Input
+                            id="sell_price"
+                            v-model="form.sell_price"
+                            inputmode="numeric"
+                            placeholder="10000"
+                        />
+                        <InputError :message="form.errors.sell_price" />
+                    </div>
+
+                    <div class="grid gap-2">
+                        <Label for="margin_percentage">Persentase Harga Jual (%)</Label>
+                        <div class="relative">
+                            <Input
+                                id="margin_percentage"
+                                v-model="form.margin_percentage"
+                                type="number"
+                                min="0"
+                                step="any"
+                                placeholder="2"
+                                class="pr-8"
+                                @keydown="(e) => { if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault(); }"
+                                @input="onMarginInput"
+                            />
+                            <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
+                        </div>
+                        <InputError :message="form.errors.margin_percentage" />
+                    </div>
+                </div>
+
+                <div v-if="Number(form.sell_price) > 0" class="rounded-lg border bg-muted/40 p-3 text-sm">
+                    <div class="flex items-center justify-between">
+                        <span class="text-muted-foreground">Harga Jual di Aplikasi Mobile:</span>
+                        <span class="text-base font-semibold text-emerald-600">
+                            {{ formattedFinalPrice }}
+                        </span>
+                    </div>
+                    <p class="mt-0.5 text-xs text-muted-foreground">
+                        Kalkulasi: Rp {{ Number(form.sell_price).toLocaleString('id-ID') }} + {{ form.margin_percentage || 0 }}% margin
+                    </p>
+                </div>
+
+                <div v-if="props.is_super_admin" class="grid gap-2">
+                    <Label>Wilayah Berlaku</Label>
+                    <SearchableCityMultiSelect
+                        v-model="form.city_ids"
+                        :cities="props.cities || []"
+                        placeholder="Pilih satu atau beberapa wilayah..."
                     />
-                    <InputError :message="form.errors.sell_price" />
+                    <InputError :message="form.errors.city_ids" />
                     <p class="text-xs text-muted-foreground">
-                        Harga ini dipakai untuk paket sesuai hasil validasi
-                        Telkomsel di samping.
+                        Pilih kabupaten/kota yang dapat menjual voucher ini. Jika tidak memilih, sistem otomatis mendeteksi berdasarkan zona Telkomsel.
                     </p>
                 </div>
 

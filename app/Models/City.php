@@ -35,4 +35,12 @@ class City extends Model
     {
         return $this->hasMany(District::class);
     }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsToMany<Voucher, $this>
+     */
+    public function vouchers(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(Voucher::class, 'voucher_cities');
+    }
 }

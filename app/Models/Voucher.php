@@ -69,6 +69,11 @@ class Voucher extends Model
         return $this->belongsTo(City::class);
     }
 
+    public function cities(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(City::class, 'voucher_cities');
+    }
+
     /**
      * Limit the query to a single city, used to scope kabupaten admins.
      *
@@ -76,6 +81,13 @@ class Voucher extends Model
      */
     public function scopeForCity(Builder $query, ?int $cityId): Builder
     {
-        return $cityId === null ? $query : $query->where('city_id', $cityId);
+        if ($cityId === null) {
+            return $query;
+        }
+
+        return $query->where(function (Builder $q) use ($cityId): void {
+            $q->where('vouchers.city_id', $cityId)
+                ->orWhereHas('cities', fn (Builder $cityQuery) => $cityQuery->where('cities.id', $cityId));
+        });
     }
 }

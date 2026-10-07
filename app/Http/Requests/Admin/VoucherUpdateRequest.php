@@ -2,10 +2,13 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Enums\VoucherStatus;
+use App\Models\Voucher;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
-class VoucherRequest extends FormRequest
+class VoucherUpdateRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
@@ -22,9 +25,19 @@ class VoucherRequest extends FormRequest
      */
     public function rules(): array
     {
+        /** @var Voucher|null $voucher */
+        $voucher = $this->route('voucher');
+        $voucherId = $voucher instanceof Voucher ? $voucher->id : $voucher;
+
         return [
-            'serial_number' => ['required', 'string', 'digits:12'],
-            'hrn' => ['required', 'string', 'digits:17'],
+            'serial_number' => [
+                'required',
+                'string',
+                'digits:12',
+                Rule::unique('vouchers', 'serial_number')->ignore($voucherId),
+            ],
+            'hrn' => ['nullable', 'string', 'digits:17'],
+            'status' => ['required', 'string', Rule::enum(VoucherStatus::class)],
             'sell_price' => ['required', 'numeric', 'min:0'],
             'margin_percentage' => ['nullable', 'numeric', 'min:0'],
             'city_ids' => ['nullable', 'array'],
@@ -42,8 +55,10 @@ class VoucherRequest extends FormRequest
         return [
             'serial_number.required' => 'Serial number wajib diisi.',
             'serial_number.digits' => 'Serial number harus terdiri dari 12 digit angka.',
-            'hrn.required' => 'HRN wajib diisi.',
+            'serial_number.unique' => 'Serial number ini sudah digunakan oleh voucher lain.',
             'hrn.digits' => 'HRN harus terdiri dari 17 digit angka.',
+            'status.required' => 'Status voucher wajib dipilih.',
+            'status.enum' => 'Status voucher tidak valid.',
             'sell_price.required' => 'Harga wajib diisi.',
             'sell_price.numeric' => 'Harga harus berupa angka.',
             'sell_price.min' => 'Harga tidak boleh negatif.',

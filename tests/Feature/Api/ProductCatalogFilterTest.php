@@ -71,3 +71,34 @@ test('a mapped telkomsel zone attributes the voucher to that city', function () 
     expect($voucher->city_id)->toBe($cityA->id)
         ->and($voucher->product->city_id)->toBe($cityA->id);
 });
+
+test('multi-city vouchers are visible to outlets in all selected cities and hidden from unselected cities', function () {
+    ['province' => $province, 'cityA' => $cityA, 'cityB' => $cityB] = twoCities();
+    $cityC = City::create(['province_id' => $province->id, 'province_code' => '11', 'code' => '11.03', 'name' => 'Aceh Barat']);
+
+    $outletA = User::factory()->customer()->create(['city_id' => $cityA->id]);
+    $outletB = User::factory()->customer()->create(['city_id' => $cityB->id]);
+    $outletC = User::factory()->customer()->create(['city_id' => $cityC->id]);
+
+    $service = app(VoucherInventoryService::class);
+    $voucher = $service->addVoucher(
+        '300338120354',
+        '71125613431848001',
+        sellPrice: 35000,
+        cityIds: [$cityA->id, $cityB->id],
+    );
+
+    $productId = $voucher->product_id;
+
+    // Outlet A sees the product
+    $resA = $this->actingAs($outletA, 'sanctum')->getJson('/api/v1/products')->assertOk();
+    expect(collect($resA->json('data'))->pluck('id'))->toContain($productId);
+
+    // Outlet B sees the product
+    $resB = $this->actingAs($outletB, 'sanctum')->getJson('/api/v1/products')->assertOk();
+    expect(collect($resB->json('data'))->pluck('id'))->toContain($productId);
+
+    // Outlet C does NOT see the product
+    $resC = $this->actingAs($outletC, 'sanctum')->getJson('/api/v1/products')->assertOk();
+    expect(collect($resC->json('data'))->pluck('id'))->not->toContain($productId);
+});
