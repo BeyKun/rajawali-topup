@@ -7,11 +7,13 @@ import {
     CheckCircle2,
     Download,
     FileSpreadsheet,
+    FileText,
     FileUp,
     ImageIcon,
     Loader2,
     Plus,
     RefreshCw,
+    Sparkles,
     Trash2,
     UploadCloud,
     Wand2,
@@ -55,6 +57,9 @@ const activeTab = ref<'photo' | 'csv'>('photo');
 const photoFile = ref<File | null>(null);
 const photoPreviewUrl = ref<string | null>(null);
 const isScanning = ref(false);
+const autoContrast = ref<boolean>(true);
+const rawOcrText = ref<string>('');
+const showRawOcr = ref<boolean>(false);
 const scanProgress = ref<OcrProgress>({ status: '', progress: 0 });
 const scannedRows = ref<ScannedVoucherRow[]>([]);
 const defaultBatchPrice = ref<number>(25000);
@@ -73,12 +78,27 @@ function onPhotoSelected(event: Event): void {
 
 async function startOcrScan(file: File): Promise<void> {
     isScanning.value = true;
-    scanProgress.value = { status: 'Memulai OCR...', progress: 0.05 };
+    scanProgress.value = { status: 'Memulai OCR & optimasi gambar...', progress: 0.05 };
+    rawOcrText.value = '';
 
     try {
-        const rows = await scanVoucherImage(file, (p) => {
-            scanProgress.value = p;
-        });
+        const rows = await scanVoucherImage(
+            file,
+            (p) => {
+                scanProgress.value = p;
+            },
+            {
+                autoContrast: autoContrast.value,
+                scaleIfNeeded: true,
+                rawTextCallback: (txt) => {
+                    rawOcrText.value = txt;
+                },
+            },
+        );
+
+        if (rows.rawText) {
+            rawOcrText.value = rows.rawText;
+        }
 
         // Set default price
         scannedRows.value = rows.map((r) => ({
@@ -131,6 +151,8 @@ function removeRow(index: number): void {
 function clearAllScanned(): void {
     scannedRows.value = [];
     photoFile.value = null;
+    rawOcrText.value = '';
+    showRawOcr.value = false;
     if (photoPreviewUrl.value) {
         URL.revokeObjectURL(photoPreviewUrl.value);
         photoPreviewUrl.value = null;
@@ -157,11 +179,18 @@ const photoForm = useForm<{
 });
 
 function submitPhotoRows(): void {
-    photoForm.rows = scannedRows.value.map((r) => ({
-        serial_number: r.serial_number.replace(/\s+/g, ''),
-        hrn: r.hrn.replace(/\s+/g, ''),
-        sell_price: Number(r.sell_price),
-    }));
+    photoForm.rows = scannedRows.value.map((r) => {
+        let serial = r.serial_number.replace(/\s+/g, '');
+        // Trim last 3 digits if 15 digits (keep only standard 12 digits)
+        if (serial.length >= 15) {
+            serial = serial.slice(0, 12);
+        }
+        return {
+            serial_number: serial,
+            hrn: r.hrn.replace(/\s+/g, ''),
+            sell_price: Number(r.sell_price),
+        };
+    });
     photoForm.city_ids = selectedCityIds.value;
     photoForm.margin_percentage = marginPercentage.value || undefined;
 
@@ -302,7 +331,18 @@ function downloadTemplate(): void {
                         </div>
                     </div>
 
-                    <div class="flex items-center gap-2">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <label class="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none border rounded-lg px-2.5 py-1.5 bg-background hover:bg-muted/50">
+                            <input
+                                v-model="autoContrast"
+                                type="checkbox"
+                                class="rounded border-input text-primary focus:ring-primary size-3.5"
+                                :disabled="isScanning"
+                            />
+                            <Sparkles class="size-3.5 text-amber-500" />
+                            <span>Auto-Enhance Kontras</span>
+                        </label>
+
                         <Button
                             type="button"
                             variant="outline"
@@ -410,16 +450,45 @@ function downloadTemplate(): void {
                             </span>
                         </div>
 
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            class="h-8 gap-1.5 text-xs"
-                            @click="addManualRow"
-                        >
-                            <Plus class="size-3.5" />
-                            Tambah Baris Manual
-                        </Button>
+                        <div class="flex items-center gap-2">
+                            <Button
+                                v-if="rawOcrText"
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                class="h-8 gap-1.5 text-xs"
+                                @click="showRawOcr = !showRawOcr"
+                            >
+                                <FileText class="size-3.5" />
+                                {{ showRawOcr ? 'Sembunyikan Raw OCR' : 'Lihat Teks Mentah (Raw OCR)' }}
+                            </Button>
+
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                class="h-8 gap-1.5 text-xs"
+                                @click="addManualRow"
+                            >
+                                <Plus class="size-3.5" />
+                                Tambah Baris Manual
+                            </Button>
+                        </div>
+                    </div>
+
+                    <!-- Collapsible Raw OCR Output for Inspection -->
+                    <div
+                        v-if="showRawOcr && rawOcrText"
+                        class="border-b bg-muted/20 p-4 space-y-1.5"
+                    >
+                        <div class="flex items-center justify-between text-xs text-muted-foreground font-medium">
+                            <span>Teks Mentah Hasil Pemindaian Tesseract:</span>
+                            <span>{{ rawOcrText.length }} karakter</span>
+                        </div>
+                        <pre class="max-h-48 overflow-y-auto rounded-lg border bg-background/80 p-3 font-mono text-[11px] leading-relaxed select-all whitespace-pre-wrap text-foreground/90">{{ rawOcrText }}</pre>
+                        <p class="text-[10px] text-muted-foreground">
+                            Tip: Anda dapat memeriksa teks di atas jika nomor seri atau kode voucher pada fisik kartu tertutup noda atau buram.
+                        </p>
                     </div>
 
                     <div class="overflow-x-auto">
@@ -450,9 +519,18 @@ function downloadTemplate(): void {
                                                 placeholder="Contoh: 300338120354"
                                                 class="h-8 font-mono text-xs"
                                             />
-                                            <span class="text-[10px] text-muted-foreground">
-                                                {{ row.serial_number.replace(/\s+/g, '').length }} digit
-                                            </span>
+                                            <div class="flex items-center gap-1.5 text-[10px]">
+                                                <span
+                                                    :class="row.serial_number.replace(/\s+/g, '').length === 12
+                                                        ? 'text-emerald-600 dark:text-emerald-400 font-medium'
+                                                        : 'text-amber-600 dark:text-amber-400'"
+                                                >
+                                                    {{ row.serial_number.replace(/\s+/g, '').length }}/12 digit
+                                                </span>
+                                                <span v-if="row.serial_number.replace(/\s+/g, '').length === 15" class="text-muted-foreground">
+                                                    (akan disimpan 12 digit)
+                                                </span>
+                                            </div>
                                         </div>
                                     </td>
                                     <td class="py-2 px-3">
@@ -462,9 +540,18 @@ function downloadTemplate(): void {
                                                 placeholder="Contoh: 71125613431848001"
                                                 class="h-8 font-mono text-xs"
                                             />
-                                            <span class="text-[10px] text-muted-foreground">
-                                                {{ row.hrn.replace(/\s+/g, '').length }} digit
-                                            </span>
+                                            <div class="flex items-center gap-1.5 text-[10px]">
+                                                <span
+                                                    :class="row.hrn.replace(/\s+/g, '').length === 17
+                                                        ? 'text-emerald-600 dark:text-emerald-400 font-medium'
+                                                        : 'text-amber-600 dark:text-amber-400 font-medium'"
+                                                >
+                                                    {{ row.hrn.replace(/\s+/g, '').length }}/17 digit
+                                                </span>
+                                                <span v-if="row.hrn.trim() && row.hrn.replace(/\s+/g, '').length < 17" class="text-amber-600 dark:text-amber-400">
+                                                    (kurang {{ 17 - row.hrn.replace(/\s+/g, '').length }})
+                                                </span>
+                                            </div>
                                         </div>
                                     </td>
                                     <td class="py-2 px-3">
@@ -477,7 +564,7 @@ function downloadTemplate(): void {
                                     </td>
                                     <td class="py-2 px-3">
                                         <span
-                                            v-if="row.serial_number.trim() && row.hrn.trim()"
+                                            v-if="row.serial_number.replace(/\s+/g, '').length >= 12 && row.hrn.replace(/\s+/g, '').length === 17"
                                             class="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400"
                                         >
                                             <CheckCircle2 class="size-3.5" /> Siap
@@ -486,7 +573,8 @@ function downloadTemplate(): void {
                                             v-else
                                             class="inline-flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400"
                                         >
-                                            <AlertCircle class="size-3.5" /> Belum lengkap
+                                            <AlertCircle class="size-3.5" />
+                                            {{ !row.hrn.trim() ? 'HRN Kosong' : (row.hrn.replace(/\s+/g, '').length < 17 ? 'HRN Kurang' : 'Cek Baris') }}
                                         </span>
                                     </td>
                                     <td class="py-2 px-3 text-center">

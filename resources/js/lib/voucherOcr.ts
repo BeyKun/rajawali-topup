@@ -14,8 +14,37 @@ export interface OcrProgress {
     progress: number;
 }
 
+export interface ScanOptions {
+    autoContrast?: boolean;
+    scaleIfNeeded?: boolean;
+    rawTextCallback?: (rawText: string) => void;
+}
+
+export interface CandidateItem {
+    rawText: string;
+    digits: string;
+    bbox: { x0: number; y0: number; x1: number; y1: number };
+    isExplicitSerial?: boolean;
+    isExplicitHrn?: boolean;
+}
+
 /**
- * Clean numeric string removing all whitespace, dashes, and common OCR noise.
+ * Remove label prefixes like "No Seri", "SN", "Kode Voucher", "HRN", "PIN"
+ * before sanitizing digits so letters (like 'o', 'S', 'i') do not turn into fake numbers.
+ */
+export function stripLabels(raw: string): string {
+    return raw
+        // Remove Serial labels: "No. Seri", "No Seri", "Nomor Seri", "Seri", "SN", "S/N", "Serial No", "Barcode"
+        .replace(/(?:no\.?\s*seri|nomor\s*seri|seri|s\/n|s\.n\b|sn\b|serial(?:\s*no(?:\.|\b)?)?|barcode)\s*[:\.\-]?\s*/gi, '')
+        // Remove Voucher code / HRN / PIN labels: "Kode Voucher", "Kode Garuk", "Kode HRN", "Kode", "HRN", "PIN", "Gosok Di Sini"
+        .replace(/(?:kode\s*voucher|kode\s*garuk|kode\s*hrn|kode\s*pin|kode\s*rahasia|kode|hrn\b|pin\b|garuk|voucher\s*code|secret\s*code|gosok(?:\s*di\s*sini|\s*disini)?)\s*[:\.\-]?\s*/gi, '')
+        // Remove common voucher card noise like URLs and expiry notes
+        .replace(/(?:masa\s*aktif|exp(?:\.|\s*date)?|berlaku\s*s\/?d|call\s*center|tsel\.me|http[s]?:\/\/\S+)\b[^\n]*/gi, '');
+}
+
+/**
+ * Clean numeric string removing common OCR confusion (O->0, I/l->1, S->5, B->8)
+ * and stripping non-digit characters.
  */
 export function sanitizeDigits(str: string): string {
     return str
@@ -27,14 +56,140 @@ export function sanitizeDigits(str: string): string {
 }
 
 /**
+ * Preprocesses an image to improve Tesseract OCR recognition accuracy.
+ * Uses client-side HTML5 Canvas for grayscale conversion, dynamic contrast stretching,
+ * and smart resolution scaling.
+ */
+export async function preprocessVoucherImage(
+    source: File | string,
+    options: { autoContrast?: boolean; scaleIfNeeded?: boolean } = { autoContrast: true, scaleIfNeeded: true },
+): Promise<string> {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+        return typeof source === 'string' ? source : URL.createObjectURL(source);
+    }
+
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+
+        const objectUrl = typeof source === 'string' ? source : URL.createObjectURL(source);
+
+        img.onload = () => {
+            try {
+                const canvas = document.createElement('canvas');
+                const naturalWidth = img.naturalWidth || img.width;
+                const naturalHeight = img.naturalHeight || img.height;
+
+                // Character height around 30-35px yields best accuracy in Tesseract.
+                // Scale small images up (min ~1400px), limit overly large images to ~2400px.
+                let scale = 1;
+                if (options.scaleIfNeeded) {
+                    if (naturalWidth < 1200) {
+                        scale = Math.min(1600 / naturalWidth, 2.5);
+                    } else if (naturalWidth > 2600) {
+                        scale = 2400 / naturalWidth;
+                    }
+                }
+
+                canvas.width = Math.round(naturalWidth * scale);
+                canvas.height = Math.round(naturalHeight * scale);
+
+                const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                if (!ctx) {
+                    resolve(objectUrl);
+                    return;
+                }
+
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const data = imgData.data;
+
+                // 1. Grayscale & compute luminance range for dynamic contrast stretching
+                let minL = 255;
+                let maxL = 0;
+                const totalPixels = data.length / 4;
+                const lums = new Uint8ClampedArray(totalPixels);
+
+                for (let i = 0, j = 0; i < data.length; i += 4, j++) {
+                    // Rec. 601 luma formula
+                    const lum = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
+                    lums[j] = lum;
+                    if (lum < minL) minL = lum;
+                    if (lum > maxL) maxL = lum;
+                }
+
+                // 2. Dynamic contrast stretching (stretches dark text to near black, background to white)
+                if (options.autoContrast && maxL > minL + 20) {
+                    const range = Math.max(maxL - minL, 1);
+                    for (let i = 0, j = 0; i < data.length; i += 4, j++) {
+                        let stretched = ((lums[j] - minL) / range) * 255;
+                        // S-curve contrast boost: darken darks, brighten lights
+                        if (stretched < 120) {
+                            stretched = Math.max(0, stretched * 0.85);
+                        } else {
+                            stretched = Math.min(255, 120 + (stretched - 120) * 1.15);
+                        }
+
+                        data[i] = stretched;
+                        data[i + 1] = stretched;
+                        data[i + 2] = stretched;
+                    }
+                } else {
+                    for (let i = 0, j = 0; i < data.length; i += 4, j++) {
+                        const val = lums[j];
+                        data[i] = val;
+                        data[i + 1] = val;
+                        data[i + 2] = val;
+                    }
+                }
+
+                ctx.putImageData(imgData, 0, 0);
+                const preprocessedUrl = canvas.toDataURL('image/jpeg', 0.92);
+                resolve(preprocessedUrl);
+            } catch (err) {
+                console.warn('Preprocessing canvas error, using original image:', err);
+                resolve(objectUrl);
+            }
+        };
+
+        img.onerror = () => {
+            resolve(objectUrl);
+        };
+
+        img.src = objectUrl;
+    });
+}
+
+/**
  * Scan an image file and extract voucher serial numbers and HRN codes.
  */
 export async function scanVoucherImage(
     imageSource: File | string,
     onProgress?: (p: OcrProgress) => void,
-): Promise<ScannedVoucherRow[]> {
+    options: ScanOptions = { autoContrast: true, scaleIfNeeded: true },
+): Promise<ScannedVoucherRow[] & { rawText?: string }> {
     if (onProgress) {
-        onProgress({ status: 'Menyiapkan engine OCR...', progress: 0.1 });
+        onProgress({ status: 'Mempersiapkan & mengoptimalkan gambar...', progress: 0.05 });
+    }
+
+    // Step 1: Preprocess image with HTML5 canvas
+    let optimizedImageSource: string = typeof imageSource === 'string' ? imageSource : URL.createObjectURL(imageSource);
+    try {
+        if (options.autoContrast !== false) {
+            optimizedImageSource = await preprocessVoucherImage(imageSource, {
+                autoContrast: options.autoContrast,
+                scaleIfNeeded: options.scaleIfNeeded,
+            });
+        }
+    } catch (e) {
+        console.warn('Canvas preprocessing skipped:', e);
+    }
+
+    if (onProgress) {
+        onProgress({ status: 'Menyiapkan engine OCR Tesseract...', progress: 0.15 });
     }
 
     const worker = await createWorker('eng', 1, {
@@ -49,62 +204,178 @@ export async function scanVoucherImage(
     });
 
     try {
-        const ret = await worker.recognize(imageSource);
+        // Step 2: Configure enhanced parameters for voucher reading
+        await worker.setParameters({
+            tessedit_pageseg_mode: '4', // Single column layout (prevents mixing QR code & right-hand instructions)
+            tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz:.-/ ()#*',
+            preserve_interword_spaces: '1',
+        });
+
+        const ret = await worker.recognize(optimizedImageSource, {}, { blocks: true });
         await worker.terminate();
 
-        if (onProgress) {
-            onProgress({ status: 'Menganalisis nomor seri & kode...', progress: 0.95 });
+        const fullText = ret.data.text || '';
+        if (options.rawTextCallback) {
+            options.rawTextCallback(fullText);
         }
 
-        const lines = (ret.data as { lines?: Array<{ text: string; bbox?: { y0: number } }> }).lines || [];
-        const detectedRows: ScannedVoucherRow[] = [];
+        if (onProgress) {
+            onProgress({ status: 'Menganalisis nomor seri & kode voucher...', progress: 0.95 });
+        }
 
-        // Strategy 1: Find lines with "No Seri" / "Seri" and look for the next line with digits
-        const serialCandidates: { text: string; digits: string; y: number }[] = [];
-        const hrnCandidates: { text: string; digits: string; y: number }[] = [];
+        // Extract all lines from Tesseract.js v7 blocks hierarchy
+        const lines: Array<{
+            text: string;
+            bbox: { x0: number; y0: number; x1: number; y1: number };
+        }> = [];
+
+        if (ret.data.blocks && Array.isArray(ret.data.blocks)) {
+            for (const b of ret.data.blocks) {
+                for (const p of b.paragraphs || []) {
+                    for (const l of p.lines || []) {
+                        const trimmed = l.text.trim();
+                        if (trimmed) {
+                            lines.push({ text: trimmed, bbox: l.bbox });
+                        }
+                    }
+                }
+            }
+        }
+
+        // Sort all lines top-to-bottom
+        lines.sort((a, b) => (a.bbox?.y0 ?? 0) - (b.bbox?.y0 ?? 0));
+
+        const serialCandidates: CandidateItem[] = [];
+        const hrnCandidates: CandidateItem[] = [];
 
         for (const line of lines) {
             const rawText = line.text.trim();
-            const y = line.bbox?.y0 ?? 0;
+            if (!rawText) continue;
 
-            // Check if line contains "No Seri", "Seri", or starts with typical Telkomsel prefix (3003)
-            const isSerialLine = /seri|no\.?\s*seri/i.test(rawText) || /^3003/i.test(rawText);
+            const bbox = line.bbox || { x0: 0, y0: 0, x1: 0, y1: 0 };
 
-            if (isSerialLine) {
-                // Extract digits after "seri" or entire digits
-                const digits = sanitizeDigits(rawText);
-                if (digits.length >= 10) {
-                    serialCandidates.push({ text: rawText, digits, y });
+            // 1. Check for Serial Number in this line
+            // Telkomsel pattern: starts with 3003 followed by digits
+            const tselSerialMatch = rawText.match(/\b(3003[\s\-]?[0-9\s\-]{8,15})\b/i);
+            const labelSerialMatch = rawText.match(/(?:no\.?\s*seri|nomor\s*seri|seri\b|s\/n\b|s\.n\b|sn\b|serial)\s*[:\.\-]?\s*([0-9\s\-]{10,18})/i);
+
+            if (tselSerialMatch || labelSerialMatch) {
+                const matchStr = tselSerialMatch ? tselSerialMatch[1] : labelSerialMatch![1];
+                let sDigits = matchStr.replace(/\D/g, '');
+
+                // Rule: For 15-digit serial numbers, discard the last 3 digits (store 12 digits)
+                if (sDigits.length >= 15) {
+                    sDigits = sDigits.slice(0, 12);
+                } else if (sDigits.startsWith('3003') && sDigits.length > 12) {
+                    sDigits = sDigits.slice(0, 12);
+                }
+
+                if (sDigits.length >= 12) {
+                    serialCandidates.push({
+                        rawText,
+                        digits: sDigits,
+                        bbox,
+                        isExplicitSerial: true,
+                    });
                     continue;
                 }
             }
 
-            // Otherwise, check if this line is an HRN code line (mostly digits, typically 12-18 digits)
-            const digits = sanitizeDigits(rawText);
-            if (digits.length >= 12 && digits.length <= 22) {
-                // Avoid matching phone numbers like 08xxx or URLs
-                if (!rawText.includes('http') && !rawText.includes('tsel.me') && !rawText.includes('@')) {
-                    hrnCandidates.push({ text: rawText, digits, y });
+            // 2. Check for Voucher Code (HRN / Garukan)
+            // Exclude lines with serial keywords, URLs, or contact center 188
+            if (!/no\.?\s*seri|nomor\s*seri|^3003/i.test(rawText)) {
+                // A. Exact 17-digit pattern: 5-5-5-2 (e.g. 71125 61343 18480 01)
+                const p17 = rawText.match(/\b(\d{5})[\s\-]+(\d{5})[\s\-]+(\d{5})[\s\-]+(\d{2})\b/);
+                if (p17) {
+                    const hDigits = `${p17[1]}${p17[2]}${p17[3]}${p17[4]}`;
+                    hrnCandidates.push({
+                        rawText,
+                        digits: hDigits,
+                        bbox,
+                        isExplicitHrn: true,
+                    });
+                    continue;
+                }
+
+                // B. 16-digit pattern: 4-4-4-4
+                const p16 = rawText.match(/\b(\d{4})[\s\-]+(\d{4})[\s\-]+(\d{4})[\s\-]+(\d{4})\b/);
+                if (p16) {
+                    const hDigits = `${p16[1]}${p16[2]}${p16[3]}${p16[4]}`;
+                    hrnCandidates.push({
+                        rawText,
+                        digits: hDigits,
+                        bbox,
+                        isExplicitHrn: true,
+                    });
+                    continue;
+                }
+
+                // C. General digit cluster
+                const cleaned = rawText
+                    .replace(/https?:\/\/\S+/gi, '')
+                    .replace(/(?:contact|center|layanan|call|voucher|wilayah|aktif|tsel\.id|tsel\.me)\b[^\n]*/gi, '');
+
+                const match = cleaned.match(/([0-9\s\-]{12,25})/);
+                if (match) {
+                    let hDigits = match[0].replace(/\D/g, '');
+                    // Handle speck like "1.29225..."
+                    if (hDigits.length === 18 && rawText.includes('.')) {
+                        hDigits = hDigits.slice(1);
+                    }
+                    if (hDigits.length > 17) {
+                        hDigits = hDigits.slice(0, 17);
+                    }
+                    if (hDigits.length >= 12) {
+                        hrnCandidates.push({
+                            rawText,
+                            digits: hDigits,
+                            bbox,
+                            isExplicitHrn: false,
+                        });
+                        continue;
+                    }
                 }
             }
         }
 
-        // Pair each serial with the closest HRN directly below it (y_hrn > y_serial)
+        // Sort candidates strictly top-to-bottom
+        serialCandidates.sort((a, b) => a.bbox.y0 - b.bbox.y0);
+        hrnCandidates.sort((a, b) => a.bbox.y0 - b.bbox.y0);
+
+        const detectedRows: ScannedVoucherRow[] = [];
         const usedHrnIndices = new Set<number>();
 
-        for (const s of serialCandidates) {
+        // Step 3: Bounded Spatial Pairing
+        // For each Serial(i), its HRN MUST be below Serial(i) and ABOVE Serial(i+1)!
+        for (let idx = 0; idx < serialCandidates.length; idx++) {
+            const s = serialCandidates[idx];
+            const nextSerial = serialCandidates[idx + 1];
+
+            const sCenterX = (s.bbox.x0 + s.bbox.x1) / 2;
+            const minY = s.bbox.y0 + 15;
+            // HRN must be before next serial (with small margin) or within 120px
+            const maxY = nextSerial ? Math.max(nextSerial.bbox.y0 - 5, minY + 30) : s.bbox.y0 + 130;
+
             let bestHrnIndex = -1;
-            let minDistance = Infinity;
+            let minScore = Infinity;
 
             for (let i = 0; i < hrnCandidates.length; i++) {
                 if (usedHrnIndices.has(i)) continue;
                 const h = hrnCandidates[i];
 
-                // Must be vertically below or close to the serial number
-                const diff = h.y - s.y;
-                if (diff >= -10 && diff < minDistance) {
-                    minDistance = diff;
-                    bestHrnIndex = i;
+                // Check horizontal column alignment (must be in same column)
+                const hCenterX = (h.bbox.x0 + h.bbox.x1) / 2;
+                const dx = Math.abs(sCenterX - hCenterX);
+                if (dx > 250) continue; // Different column
+
+                // Must be within vertical boundary of this voucher card
+                if (h.bbox.y0 >= minY && h.bbox.y0 <= maxY) {
+                    const dy = h.bbox.y0 - s.bbox.y0;
+                    const score = Math.hypot(dx * 1.5, dy);
+                    if (score < minScore) {
+                        minScore = score;
+                        bestHrnIndex = i;
+                    }
                 }
             }
 
@@ -115,62 +386,25 @@ export async function scanVoucherImage(
             }
 
             detectedRows.push({
-                id: `v-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                id: `v-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
                 serial_number: s.digits,
                 hrn: hrnDigits,
                 sell_price: 25000,
-                serial_status: s.digits.length >= 12 ? 'valid' : 'warning',
-                hrn_status: hrnDigits.length >= 14 ? 'valid' : 'warning',
+                serial_status: s.digits.length === 12 ? 'valid' : 'warning',
+                hrn_status: hrnDigits.length === 17 ? 'valid' : 'warning',
             });
-        }
-
-        // Fallback: If pairing by Y yielded nothing but we found equal numbers of serial and hrn lines
-        if (detectedRows.length === 0 && serialCandidates.length > 0) {
-            for (let i = 0; i < serialCandidates.length; i++) {
-                const s = serialCandidates[i];
-                const h = hrnCandidates[i];
-                detectedRows.push({
-                    id: `v-${Date.now()}-${i}`,
-                    serial_number: s.digits,
-                    hrn: h ? h.digits : '',
-                    sell_price: 25000,
-                    serial_status: s.digits.length >= 12 ? 'valid' : 'warning',
-                    hrn_status: h && h.digits.length >= 14 ? 'valid' : 'warning',
-                });
-            }
-        }
-
-        // Fallback 2: Regex across full text if line detection was fragmented
-        if (detectedRows.length === 0) {
-            const fullText = ret.data.text;
-            const serialMatches = Array.from(fullText.matchAll(/(?:no\s*seri\s*[:\.]?|seri\s*[:\.]?)\s*([0-9\s]{12,22})/gi));
-            const hrnMatches = Array.from(fullText.matchAll(/\b([0-9]{5}\s+[0-9]{5}\s+[0-9]{5}\s+[0-9]{2})\b/gi));
-
-            const count = Math.max(serialMatches.length, hrnMatches.length);
-            for (let i = 0; i < count; i++) {
-                const sDigits = serialMatches[i] ? sanitizeDigits(serialMatches[i][1]) : '';
-                const hDigits = hrnMatches[i] ? sanitizeDigits(hrnMatches[i][1]) : '';
-
-                if (sDigits || hDigits) {
-                    detectedRows.push({
-                        id: `v-${Date.now()}-${i}`,
-                        serial_number: sDigits,
-                        hrn: hDigits,
-                        sell_price: 25000,
-                        serial_status: sDigits.length >= 12 ? 'valid' : 'warning',
-                        hrn_status: hDigits.length >= 14 ? 'valid' : 'warning',
-                    });
-                }
-            }
         }
 
         if (onProgress) {
             onProgress({ status: 'Selesai!', progress: 1 });
         }
 
-        return detectedRows;
+        const resultRows = detectedRows as ScannedVoucherRow[] & { rawText?: string };
+        resultRows.rawText = fullText;
+        return resultRows;
     } catch (error) {
         await worker.terminate();
         throw error;
     }
 }
+
