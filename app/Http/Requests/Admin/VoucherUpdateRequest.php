@@ -19,6 +19,22 @@ class VoucherUpdateRequest extends FormRequest
     }
 
     /**
+     * Prepare the data for validation.
+     */
+    protected function prepareForValidation(): void
+    {
+        $data = [
+            'serial_number' => preg_replace('/\s+/', '', (string) $this->input('serial_number')),
+        ];
+
+        if ($this->filled('hrn')) {
+            $data['hrn'] = preg_replace('/\s+/', '', (string) $this->input('hrn'));
+        }
+
+        $this->merge($data);
+    }
+
+    /**
      * Get the validation rules that apply to the request.
      *
      * @return array<string, ValidationRule|array<mixed>|string>

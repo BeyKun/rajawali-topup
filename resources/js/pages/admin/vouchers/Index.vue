@@ -41,6 +41,12 @@ import {
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { formatDateTime, formatRupiah } from '@/lib/format';
+import {
+    cleanDigits,
+    formatHrn,
+    formatSerialNumber,
+    handleFormattedInput,
+} from '@/lib/voucherFormat';
 import type {
     AdminVoucher,
     Paginator,
@@ -117,7 +123,7 @@ const editForm = useForm({
 function openEdit(voucher: AdminVoucher): void {
     editingVoucher.value = voucher;
     editForm.clearErrors();
-    editForm.serial_number = voucher.serial_number;
+    editForm.serial_number = formatSerialNumber(voucher.serial_number);
     editForm.hrn = '';
     editForm.sell_price = voucher.hpp_price != null ? String(voucher.hpp_price) : (voucher.sell_price != null ? String(voucher.sell_price) : '');
     editForm.margin_percentage = voucher.margin_percentage != null ? String(voucher.margin_percentage) : '2';
@@ -126,6 +132,18 @@ function openEdit(voucher: AdminVoucher): void {
     checkError.value = null;
     preview.value = null;
     showEditDialog.value = true;
+}
+
+function onEditSerialInput(event: Event): void {
+    handleFormattedInput(event, formatSerialNumber, (val) => {
+        editForm.serial_number = val;
+    });
+}
+
+function onEditHrnInput(event: Event): void {
+    handleFormattedInput(event, formatHrn, (val) => {
+        editForm.hrn = val;
+    });
 }
 
 const calculatedFinalPrice = computed(() => {
@@ -162,12 +180,13 @@ const preview = ref<VoucherCheckResult | null>(null);
 const checkError = ref<string | null>(null);
 
 async function checkSerial(): Promise<void> {
-    if (!editForm.serial_number) {
+    const cleanSerial = cleanDigits(editForm.serial_number);
+    if (!cleanSerial) {
         checkError.value = 'Isi serial number terlebih dahulu.';
         return;
     }
 
-    checkRequest.serial_number = editForm.serial_number;
+    checkRequest.serial_number = cleanSerial;
     checkError.value = null;
     preview.value = null;
 
@@ -186,7 +205,11 @@ async function checkSerial(): Promise<void> {
 function submitEdit(): void {
     if (!editingVoucher.value) return;
 
-    editForm.put(`/admin/vouchers/${editingVoucher.value.id}`, {
+    editForm.transform((data) => ({
+        ...data,
+        serial_number: cleanDigits(data.serial_number),
+        hrn: cleanDigits(data.hrn),
+    })).put(`/admin/vouchers/${editingVoucher.value.id}`, {
         preserveScroll: true,
         onSuccess: () => {
             showEditDialog.value = false;
@@ -304,7 +327,7 @@ function submitEdit(): void {
                         class="border-t"
                     >
                         <td class="px-4 py-3 font-mono text-xs">
-                            {{ voucher.serial_number }}
+                            {{ formatSerialNumber(voucher.serial_number) }}
                         </td>
                         <td class="px-4 py-3">
                             {{ voucher.product_name ?? '-' }}
@@ -416,10 +439,11 @@ function submitEdit(): void {
                         <div class="flex gap-2">
                             <Input
                                 id="edit_serial_number"
-                                v-model="editForm.serial_number"
+                                :model-value="editForm.serial_number"
                                 inputmode="numeric"
-                                maxlength="12"
-                                placeholder="300338120354"
+                                maxlength="14"
+                                placeholder="3003 3812 0354"
+                                @input="onEditSerialInput"
                             />
                             <Button
                                 type="button"
@@ -454,10 +478,11 @@ function submitEdit(): void {
                         <Label for="edit_hrn">HRN (17 digit)</Label>
                         <Input
                             id="edit_hrn"
-                            v-model="editForm.hrn"
+                            :model-value="editForm.hrn"
                             inputmode="numeric"
-                            maxlength="17"
-                            placeholder="Biarkan kosong jika tidak diubah"
+                            maxlength="20"
+                            placeholder="Contoh: 71125 61343 18480 01 (kosongkan jika tidak diubah)"
+                            @input="onEditHrnInput"
                         />
                         <InputError :message="editForm.errors.hrn" />
                         <p class="text-xs text-muted-foreground">

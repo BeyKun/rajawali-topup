@@ -33,6 +33,12 @@ import {
     type ScannedVoucherRow,
     scanVoucherImage,
 } from '@/lib/voucherOcr';
+import {
+    cleanDigits,
+    formatHrn,
+    formatSerialNumber,
+    handleFormattedInput,
+} from '@/lib/voucherFormat';
 
 defineOptions({
     layout: {
@@ -100,9 +106,11 @@ async function startOcrScan(file: File): Promise<void> {
             rawOcrText.value = rows.rawText;
         }
 
-        // Set default price
+        // Set default price and format with spaces for easy reading
         scannedRows.value = rows.map((r) => ({
             ...r,
+            serial_number: formatSerialNumber(r.serial_number),
+            hrn: formatHrn(r.hrn),
             sell_price: defaultBatchPrice.value,
         }));
 
@@ -144,6 +152,18 @@ function addManualRow(): void {
     });
 }
 
+function onSerialInput(row: ScannedVoucherRow, event: Event): void {
+    handleFormattedInput(event, formatSerialNumber, (val) => {
+        row.serial_number = val;
+    });
+}
+
+function onHrnInput(row: ScannedVoucherRow, event: Event): void {
+    handleFormattedInput(event, formatHrn, (val) => {
+        row.hrn = val;
+    });
+}
+
 function removeRow(index: number): void {
     scannedRows.value.splice(index, 1);
 }
@@ -159,11 +179,21 @@ function clearAllScanned(): void {
     }
 }
 
+const validVouchersCount = computed(() => {
+    return scannedRows.value.filter(
+        (r) => r.serial_number.replace(/\s+/g, '').length >= 12 && r.hrn.replace(/\s+/g, '').length >= 14,
+    ).length;
+});
+
+const incompleteVouchersCount = computed(() => {
+    return scannedRows.value.length - validVouchersCount.value;
+});
+
 const isPhotoSubmitValid = computed(() => {
     return (
         scannedRows.value.length > 0 &&
         scannedRows.value.every(
-            (r) => r.serial_number.trim() !== '' && r.hrn.trim() !== '' && r.sell_price > 0,
+            (r) => cleanDigits(r.serial_number) !== '' && cleanDigits(r.hrn) !== '' && r.sell_price > 0,
         )
     );
 });
@@ -180,14 +210,14 @@ const photoForm = useForm<{
 
 function submitPhotoRows(): void {
     photoForm.rows = scannedRows.value.map((r) => {
-        let serial = r.serial_number.replace(/\s+/g, '');
+        let serial = cleanDigits(r.serial_number);
         // Trim last 3 digits if 15 digits (keep only standard 12 digits)
         if (serial.length >= 15) {
             serial = serial.slice(0, 12);
         }
         return {
             serial_number: serial,
-            hrn: r.hrn.replace(/\s+/g, ''),
+            hrn: cleanDigits(r.hrn),
             sell_price: Number(r.sell_price),
         };
     });
@@ -443,10 +473,22 @@ function downloadTemplate(): void {
                 <!-- Review & Edit Extracted Vouchers Table -->
                 <div class="rounded-xl border bg-card overflow-hidden">
                     <div class="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/30 px-4 py-3">
-                        <div class="flex items-center gap-2">
+                        <div class="flex flex-wrap items-center gap-2">
                             <h4 class="text-sm font-semibold">Hasil Deteksi Voucher</h4>
                             <span class="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
                                 {{ scannedRows.length }} Baris
+                            </span>
+                            <span
+                                v-if="scannedRows.length > 0 && validVouchersCount > 0"
+                                class="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400"
+                            >
+                                {{ validVouchersCount }} Siap
+                            </span>
+                            <span
+                                v-if="incompleteVouchersCount > 0"
+                                class="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-600 dark:text-amber-400"
+                            >
+                                {{ incompleteVouchersCount }} Perlu Cek
                             </span>
                         </div>
 
@@ -515,9 +557,10 @@ function downloadTemplate(): void {
                                     <td class="py-2 px-3">
                                         <div class="space-y-1">
                                             <Input
-                                                v-model="row.serial_number"
-                                                placeholder="Contoh: 300338120354"
+                                                :model-value="row.serial_number"
+                                                placeholder="Contoh: 3003 3812 0354"
                                                 class="h-8 font-mono text-xs"
+                                                @input="onSerialInput(row, $event)"
                                             />
                                             <div class="flex items-center gap-1.5 text-[10px]">
                                                 <span
@@ -536,20 +579,30 @@ function downloadTemplate(): void {
                                     <td class="py-2 px-3">
                                         <div class="space-y-1">
                                             <Input
-                                                v-model="row.hrn"
-                                                placeholder="Contoh: 71125613431848001"
+                                                :model-value="row.hrn"
+                                                placeholder="Contoh: 71125 61343 18480 01"
                                                 class="h-8 font-mono text-xs"
+                                                @input="onHrnInput(row, $event)"
                                             />
                                             <div class="flex items-center gap-1.5 text-[10px]">
                                                 <span
-                                                    :class="row.hrn.replace(/\s+/g, '').length === 17
+                                                    :class="row.hrn.replace(/\s+/g, '').length >= 14 && row.hrn.replace(/\s+/g, '').length <= 17
                                                         ? 'text-emerald-600 dark:text-emerald-400 font-medium'
                                                         : 'text-amber-600 dark:text-amber-400 font-medium'"
                                                 >
-                                                    {{ row.hrn.replace(/\s+/g, '').length }}/17 digit
+                                                    {{ row.hrn.replace(/\s+/g, '').length }} digit
                                                 </span>
-                                                <span v-if="row.hrn.trim() && row.hrn.replace(/\s+/g, '').length < 17" class="text-amber-600 dark:text-amber-400">
-                                                    (kurang {{ 17 - row.hrn.replace(/\s+/g, '').length }})
+                                                <span v-if="row.hrn.replace(/\s+/g, '').length === 17" class="text-muted-foreground text-[10px]">
+                                                    (17-digit Telkomsel)
+                                                </span>
+                                                <span v-else-if="row.hrn.replace(/\s+/g, '').length === 16" class="text-muted-foreground text-[10px]">
+                                                    (16-digit standar)
+                                                </span>
+                                                <span v-else-if="row.hrn.replace(/\s+/g, '').length === 14" class="text-muted-foreground text-[10px]">
+                                                    (14-digit Indosat)
+                                                </span>
+                                                <span v-else-if="row.hrn.trim() && row.hrn.replace(/\s+/g, '').length < 14" class="text-amber-600 dark:text-amber-400">
+                                                    (kurang {{ 14 - row.hrn.replace(/\s+/g, '').length }})
                                                 </span>
                                             </div>
                                         </div>
@@ -564,7 +617,7 @@ function downloadTemplate(): void {
                                     </td>
                                     <td class="py-2 px-3">
                                         <span
-                                            v-if="row.serial_number.replace(/\s+/g, '').length >= 12 && row.hrn.replace(/\s+/g, '').length === 17"
+                                            v-if="row.serial_number.replace(/\s+/g, '').length >= 12 && row.hrn.replace(/\s+/g, '').length >= 14"
                                             class="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400"
                                         >
                                             <CheckCircle2 class="size-3.5" /> Siap
@@ -574,7 +627,7 @@ function downloadTemplate(): void {
                                             class="inline-flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400"
                                         >
                                             <AlertCircle class="size-3.5" />
-                                            {{ !row.hrn.trim() ? 'HRN Kosong' : (row.hrn.replace(/\s+/g, '').length < 17 ? 'HRN Kurang' : 'Cek Baris') }}
+                                            {{ !row.serial_number.trim() ? 'SN Kosong' : (!row.hrn.trim() ? 'Kode Kosong' : 'Perlu Cek') }}
                                         </span>
                                     </td>
                                     <td class="py-2 px-3 text-center">

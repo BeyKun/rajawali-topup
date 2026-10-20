@@ -16,6 +16,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import {
+    cleanDigits,
+    formatHrn,
+    formatSerialNumber,
+    handleFormattedInput,
+} from '@/lib/voucherFormat';
 import type { VoucherCheckResult } from '@/types';
 
 defineOptions({
@@ -75,13 +81,26 @@ const checkRequest = useHttp<{ serial_number: string }, VoucherCheckResult>({
 const preview = ref<VoucherCheckResult | null>(null);
 const checkError = ref<string | null>(null);
 
+function onSerialInput(event: Event): void {
+    handleFormattedInput(event, formatSerialNumber, (val) => {
+        form.serial_number = val;
+    });
+}
+
+function onHrnInput(event: Event): void {
+    handleFormattedInput(event, formatHrn, (val) => {
+        form.hrn = val;
+    });
+}
+
 async function checkSerial(): Promise<void> {
-    if (!form.serial_number) {
+    const cleanSerial = cleanDigits(form.serial_number);
+    if (!cleanSerial) {
         checkError.value = 'Isi serial number terlebih dahulu.';
         return;
     }
 
-    checkRequest.serial_number = form.serial_number;
+    checkRequest.serial_number = cleanSerial;
     checkError.value = null;
     preview.value = null;
 
@@ -98,7 +117,11 @@ async function checkSerial(): Promise<void> {
 }
 
 function submit(): void {
-    form.post('/admin/vouchers');
+    form.transform((data) => ({
+        ...data,
+        serial_number: cleanDigits(data.serial_number),
+        hrn: cleanDigits(data.hrn),
+    })).post('/admin/vouchers');
 }
 </script>
 
@@ -126,10 +149,11 @@ function submit(): void {
                     <div class="flex gap-2">
                         <Input
                             id="serial_number"
-                            v-model="form.serial_number"
+                            :model-value="form.serial_number"
                             inputmode="numeric"
-                            maxlength="12"
-                            placeholder="300338120354"
+                            maxlength="14"
+                            placeholder="3003 3812 0354"
+                            @input="onSerialInput"
                         />
                         <Button
                             type="button"
@@ -149,10 +173,11 @@ function submit(): void {
                     <Label for="hrn">HRN (17 digit)</Label>
                     <Input
                         id="hrn"
-                        v-model="form.hrn"
+                        :model-value="form.hrn"
                         inputmode="numeric"
-                        maxlength="17"
-                        placeholder="71125613431848001"
+                        maxlength="20"
+                        placeholder="71125 61343 18480 01"
+                        @input="onHrnInput"
                     />
                     <InputError :message="form.errors.hrn" />
                     <p class="text-xs text-muted-foreground">
