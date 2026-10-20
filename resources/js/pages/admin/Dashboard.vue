@@ -1,15 +1,18 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { usePage } from '@inertiajs/vue3';
 import {
     AlertTriangle,
     ArrowRight,
     Boxes,
+    Radio,
     Receipt,
     ShoppingCart,
     Ticket,
     TrendingUp,
     Wallet,
 } from '@lucide/vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { toast } from 'vue-sonner';
 import Heading from '@/components/Heading.vue';
 import StatusBadge from '@/components/admin/StatusBadge.vue';
 import { Button } from '@/components/ui/button';
@@ -20,7 +23,9 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import { useEcho } from '@/composables/useEcho';
 import { formatDate, formatDateTime, formatRupiah, formatShortDay } from '@/lib/format';
+import { playNotificationSound } from '@/lib/notificationSound';
 import type {
     AdminDashboardStats,
     AdminLowStockItem,
@@ -43,34 +48,212 @@ const props = defineProps<{
     recentOrders: AdminRecentOrder[];
 }>();
 
+const page = usePage();
+const currentUser = computed(() => page.props.auth?.user as { city_id?: number | null; role?: string } | undefined);
+
+// Local reactive state for realtime updates
+const stats = ref<AdminDashboardStats>({ ...props.stats });
+const recentOrders = ref<AdminRecentOrder[]>([...props.recentOrders]);
+const salesChart = ref<AdminSalesPoint[]>([...props.salesChart]);
+const isLiveConnected = ref(false);
+const highlightedOrderNo = ref<string | null>(null);
+
+// Keep synchronized if props change (e.g. Inertia visit)
+watch(() => props.stats, (newVal) => { stats.value = { ...newVal }; });
+watch(() => props.recentOrders, (newVal) => { recentOrders.value = [...newVal]; });
+watch(() => props.salesChart, (newVal) => { salesChart.value = [...newVal]; });
+
 const chartMetric = ref<'revenue' | 'orders'>('revenue');
 const hoveredPoint = ref<AdminSalesPoint | null>(null);
 
 const maxRevenue = computed(() => {
-    const raw = Math.max(...props.salesChart.map((point) => point.revenue), 0);
+    const raw = Math.max(...salesChart.value.map((point) => point.revenue), 0);
     return raw > 0 ? raw : 100000;
 });
 
 const maxOrders = computed(() => {
-    const raw = Math.max(...props.salesChart.map((point) => point.orders), 0);
+    const raw = Math.max(...salesChart.value.map((point) => point.orders), 0);
     return raw > 0 ? raw : 10;
 });
 
 const total7DaysRevenue = computed(() => {
-    return props.salesChart.reduce((sum, p) => sum + p.revenue, 0);
+    return salesChart.value.reduce((sum, p) => sum + p.revenue, 0);
 });
 
 const total7DaysOrders = computed(() => {
-    return props.salesChart.reduce((sum, p) => sum + p.orders, 0);
+    return salesChart.value.reduce((sum, p) => sum + p.orders, 0);
+});
+
+function triggerHighlight(orderNo: string): void {
+    highlightedOrderNo.value = orderNo;
+    setTimeout(() => {
+        if (highlightedOrderNo.value === orderNo) {
+            highlightedOrderNo.value = null;
+        }
+    }, 4000);
+}
+
+onMounted(() => {
+    const echo = useEcho();
+    if (!echo) {
+        return;
+    }
+
+    const channel = echo.private('admin.orders');
+
+    channel.subscribed(() => {
+        isLiveConnected.value = true;
+    });
+
+    // 1. OrderCreated Event
+    channel.listen(
+        '.OrderCreated',
+        (event: {
+            order: AdminRecentOrder & { id: number; city_id?: number | null };
+            message?: string;
+        }) => {
+            const incoming = event.order;
+
+            // If user is a kabupaten admin, only accept orders matching their city
+            if (currentUser.value?.role === 'kabupaten_admin') {
+                if (currentUser.value.city_id && incoming.city_id !== currentUser.value.city_id) {
+                    return;
+                }
+            }
+
+            // Play notification sound
+            playNotificationSound();
+
+            // Notify user
+            toast.success(`Pesanan Baru: ${incoming.order_no}`, {
+                description: `${incoming.product_name ?? 'Paket'} - ${formatRupiah(incoming.total_amount)}`,
+            });
+
+            // Update stats
+            stats.value.orders_today++;
+            stats.value.total_orders++;
+
+            // Update sales chart for today (last point in the array)
+            if (salesChart.value.length > 0) {
+                const todayPoint = salesChart.value[salesChart.value.length - 1];
+                todayPoint.orders += 1;
+            }
+
+            // Prepend to recent orders
+            recentOrders.value = [
+                {
+                    order_no: incoming.order_no,
+                    product_name: incoming.product_name,
+                    msisdn: incoming.msisdn,
+                    total_amount: incoming.total_amount,
+                    payment_status: incoming.payment_status,
+                    redeem_status: incoming.redeem_status,
+                    created_at: incoming.created_at,
+                },
+                ...recentOrders.value.slice(0, 9),
+            ];
+
+            triggerHighlight(incoming.order_no);
+        },
+    );
+
+    // 2. OrderStatusUpdated Event
+    channel.listen(
+        '.OrderStatusUpdated',
+        (event: {
+            order: AdminRecentOrder & { id: number; city_id?: number | null };
+            message?: string;
+        }) => {
+            const updated = event.order;
+
+            if (currentUser.value?.role === 'kabupaten_admin') {
+                if (currentUser.value.city_id && updated.city_id !== currentUser.value.city_id) {
+                    return;
+                }
+            }
+
+            // Find order in recent orders
+            const index = recentOrders.value.findIndex((o) => o.order_no === updated.order_no);
+            if (index !== -1) {
+                const prev = recentOrders.value[index];
+                const wasPaid = prev.payment_status === 'PAID';
+                const isPaidNow = updated.payment_status === 'PAID';
+
+                recentOrders.value[index] = {
+                    ...prev,
+                    payment_status: updated.payment_status,
+                    redeem_status: updated.redeem_status,
+                };
+
+                // If freshly marked paid, update revenue stats
+                if (!wasPaid && isPaidNow) {
+                    stats.value.revenue_today += updated.total_amount;
+                    stats.value.revenue_this_month += updated.total_amount;
+
+                    if (salesChart.value.length > 0) {
+                        const todayPoint = salesChart.value[salesChart.value.length - 1];
+                        todayPoint.revenue += updated.total_amount;
+                    }
+
+                    toast.success(`Pembayaran Diterima: ${updated.order_no}`, {
+                        description: `Total: ${formatRupiah(updated.total_amount)}`,
+                    });
+                }
+
+                // If redeem became SUCCESS
+                if (prev.redeem_status !== 'SUCCESS' && updated.redeem_status === 'SUCCESS') {
+                    stats.value.redeemed_vouchers++;
+                    if (stats.value.available_vouchers > 0) {
+                        stats.value.available_vouchers--;
+                    }
+                }
+
+                // If order failed
+                if (
+                    (prev.payment_status !== 'FAILED' && updated.payment_status === 'FAILED') ||
+                    (prev.redeem_status !== 'FAILED' && updated.redeem_status === 'FAILED')
+                ) {
+                    stats.value.failed_orders++;
+                }
+
+                triggerHighlight(updated.order_no);
+            }
+        },
+    );
+});
+
+onUnmounted(() => {
+    const echo = useEcho();
+    echo?.leave('admin.orders');
 });
 </script>
 
 <template>
     <div class="flex h-full flex-1 flex-col gap-4 p-4">
-        <Heading
-            title="Dashboard Admin"
-            description="Ringkasan penjualan, stok voucher fisik, dan transaksi terbaru."
-        />
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <Heading
+                title="Dashboard Admin"
+                description="Ringkasan penjualan, stok voucher fisik, dan transaksi terbaru."
+            />
+
+            <!-- Realtime connection status badge -->
+            <div class="flex items-center gap-2 self-start sm:self-auto rounded-full border bg-background/80 px-3 py-1 shadow-xs">
+                <span class="relative flex size-2">
+                    <span
+                        class="absolute inline-flex size-full animate-ping rounded-full opacity-75"
+                        :class="isLiveConnected ? 'bg-emerald-400' : 'bg-amber-400'"
+                    ></span>
+                    <span
+                        class="relative inline-flex size-2 rounded-full"
+                        :class="isLiveConnected ? 'bg-emerald-500' : 'bg-amber-500'"
+                    ></span>
+                </span>
+                <span class="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                    <Radio class="size-3" />
+                    {{ isLiveConnected ? 'Realtime Aktif' : 'Menghubungkan...' }}
+                </span>
+            </div>
+        </div>
 
         <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <Card class="gap-4">
@@ -78,12 +261,12 @@ const total7DaysOrders = computed(() => {
                     <CardDescription class="flex items-center gap-2">
                         <Wallet class="size-4" /> Omset Hari Ini
                     </CardDescription>
-                    <CardTitle class="text-2xl">
-                        {{ formatRupiah(props.stats.revenue_today) }}
+                    <CardTitle class="text-2xl transition-all">
+                        {{ formatRupiah(stats.revenue_today) }}
                     </CardTitle>
                 </CardHeader>
                 <CardContent class="text-xs text-muted-foreground">
-                    Bulan ini: {{ formatRupiah(props.stats.revenue_this_month) }}
+                    Bulan ini: {{ formatRupiah(stats.revenue_this_month) }}
                 </CardContent>
             </Card>
 
@@ -92,12 +275,12 @@ const total7DaysOrders = computed(() => {
                     <CardDescription class="flex items-center gap-2">
                         <ShoppingCart class="size-4" /> Pesanan
                     </CardDescription>
-                    <CardTitle class="text-2xl">
-                        {{ props.stats.orders_today }}
+                    <CardTitle class="text-2xl transition-all">
+                        {{ stats.orders_today }}
                     </CardTitle>
                 </CardHeader>
                 <CardContent class="text-xs text-muted-foreground">
-                    Total {{ props.stats.total_orders }} transaksi
+                    Total {{ stats.total_orders }} transaksi
                 </CardContent>
             </Card>
 
@@ -106,12 +289,12 @@ const total7DaysOrders = computed(() => {
                     <CardDescription class="flex items-center gap-2">
                         <Ticket class="size-4" /> Stok Voucher
                     </CardDescription>
-                    <CardTitle class="text-2xl">
-                        {{ props.stats.available_vouchers }}
+                    <CardTitle class="text-2xl transition-all">
+                        {{ stats.available_vouchers }}
                     </CardTitle>
                 </CardHeader>
                 <CardContent class="text-xs text-muted-foreground">
-                    {{ props.stats.redeemed_vouchers }} voucher ter-redeem
+                    {{ stats.redeemed_vouchers }} voucher ter-redeem
                 </CardContent>
             </Card>
 
@@ -121,14 +304,14 @@ const total7DaysOrders = computed(() => {
                         <AlertTriangle class="size-4" /> Perlu Perhatian
                     </CardDescription>
                     <CardTitle
-                        class="text-2xl"
+                        class="text-2xl transition-all"
                         :class="
-                            props.stats.failed_orders > 0
+                            stats.failed_orders > 0
                                 ? 'text-destructive'
                                 : ''
                         "
                     >
-                        {{ props.stats.failed_orders }}
+                        {{ stats.failed_orders }}
                     </CardTitle>
                 </CardHeader>
                 <CardContent class="text-xs text-muted-foreground">
@@ -190,7 +373,7 @@ const total7DaysOrders = computed(() => {
                         <!-- Bar chart columns -->
                         <div class="relative z-10 flex h-48 items-end justify-between gap-2 sm:gap-3 px-2 sm:px-4 pb-6">
                             <div
-                                v-for="point in props.salesChart"
+                                v-for="point in salesChart"
                                 :key="point.date"
                                 class="group relative flex flex-1 flex-col items-center h-full justify-end cursor-pointer"
                                 @mouseenter="hoveredPoint = point"
@@ -238,7 +421,7 @@ const total7DaysOrders = computed(() => {
                         <!-- X Axis dates -->
                         <div class="flex justify-between gap-2 sm:gap-3 px-2 sm:px-4 pt-1 border-t">
                             <div
-                                v-for="point in props.salesChart"
+                                v-for="point in salesChart"
                                 :key="point.date"
                                 class="flex-1 text-center"
                             >
@@ -324,7 +507,7 @@ const total7DaysOrders = computed(() => {
                         <Receipt class="size-4" /> Transaksi Terbaru
                     </CardTitle>
                     <CardDescription>
-                        {{ props.recentOrders.length }} pesanan terakhir.
+                        {{ recentOrders.length }} pesanan terakhir (diperbarui otomatis secara realtime).
                     </CardDescription>
                 </div>
                 <Button variant="outline" size="sm" as-child>
@@ -350,11 +533,16 @@ const total7DaysOrders = computed(() => {
                         </thead>
                         <tbody>
                             <tr
-                                v-for="order in props.recentOrders"
+                                v-for="order in recentOrders"
                                 :key="order.order_no"
-                                class="border-t"
+                                class="border-t transition-colors duration-700"
+                                :class="
+                                    highlightedOrderNo === order.order_no
+                                        ? 'bg-primary/15 dark:bg-primary/25'
+                                        : ''
+                                "
                             >
-                                <td class="py-2 font-mono text-xs">
+                                <td class="py-2 font-mono text-xs font-semibold">
                                     {{ order.order_no }}
                                 </td>
                                 <td class="py-2">{{ order.product_name ?? '-' }}</td>
@@ -376,7 +564,7 @@ const total7DaysOrders = computed(() => {
                                     {{ formatDateTime(order.created_at) }}
                                 </td>
                             </tr>
-                            <tr v-if="props.recentOrders.length === 0">
+                            <tr v-if="recentOrders.length === 0">
                                 <td
                                     colspan="7"
                                     class="py-10 text-center text-muted-foreground"

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
@@ -37,9 +38,9 @@ class City extends Model
     }
 
     /**
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsToMany<Voucher, $this>
+     * @return BelongsToMany<Voucher, $this>
      */
-    public function vouchers(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    public function vouchers(): BelongsToMany
     {
         return $this->belongsToMany(Voucher::class, 'voucher_cities');
     }

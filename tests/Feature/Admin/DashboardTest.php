@@ -2,8 +2,10 @@
 
 use App\Enums\PaymentStatus;
 use App\Enums\RedeemStatus;
+use App\Models\City;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\Province;
 use App\Models\User;
 use App\Models\Voucher;
 use Inertia\Testing\AssertableInertia;
@@ -42,9 +44,9 @@ test('dashboard page renders with analytics props', function () {
 });
 
 test('wilayah admin dashboard is scoped strictly to their city', function () {
-    $province = \App\Models\Province::create(['code' => '11', 'name' => 'Aceh']);
-    $cityA = \App\Models\City::create(['province_id' => $province->id, 'province_code' => '11', 'code' => '11.01', 'name' => 'Aceh Selatan']);
-    $cityB = \App\Models\City::create(['province_id' => $province->id, 'province_code' => '11', 'code' => '11.02', 'name' => 'Aceh Singkil']);
+    $province = Province::create(['code' => '11', 'name' => 'Aceh']);
+    $cityA = City::create(['province_id' => $province->id, 'province_code' => '11', 'code' => '11.01', 'name' => 'Aceh Selatan']);
+    $cityB = City::create(['province_id' => $province->id, 'province_code' => '11', 'code' => '11.02', 'name' => 'Aceh Singkil']);
     $wilayahAdmin = User::factory()->kabupatenAdmin($province->id, $cityA->id)->create();
 
     $productA = Product::factory()->create(['city_id' => $cityA->id, 'sell_price' => 15000]);

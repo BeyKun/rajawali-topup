@@ -27,9 +27,22 @@ const { isCurrentUrl } = useCurrentUrl();
                     :is-active="isCurrentUrl(item.href)"
                     :tooltip="item.title"
                 >
-                    <Link :href="item.href">
-                        <component :is="item.icon" />
-                        <span>{{ item.title }}</span>
+                    <Link :href="item.href" class="flex w-full items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <component :is="item.icon" />
+                            <span>{{ item.title }}</span>
+                        </div>
+                        <span
+                            v-if="item.badge"
+                            class="ml-auto inline-flex items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold transition-all"
+                            :class="
+                                item.badgeVariant === 'destructive'
+                                    ? 'bg-destructive text-destructive-foreground'
+                                    : 'bg-primary/15 text-primary'
+                            "
+                        >
+                            {{ item.badge }}
+                        </span>
                     </Link>
                 </SidebarMenuButton>
             </SidebarMenuItem>

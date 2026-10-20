@@ -248,4 +248,3 @@ test('ProcessVoucherRedeemJob sets REFUNDED when Midtrans online refund succeeds
         ->and((float) $order->refund_amount)->toBe(20000.00)
         ->and($order->refunded_at)->not->toBeNull();
 });
-

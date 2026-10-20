@@ -8,6 +8,7 @@ use App\Http\Requests\Admin\VoucherCheckRequest;
 use App\Http\Requests\Admin\VoucherRequest;
 use App\Http\Requests\Admin\VoucherUpdateRequest;
 use App\Jobs\ValidateVoucherBatchJob;
+use App\Models\City;
 use App\Models\Voucher;
 use App\Services\TelkomselVoucherService;
 use App\Services\VoucherInventoryService;
@@ -40,11 +41,11 @@ class VoucherController extends Controller
 
         $isSuperAdmin = (bool) $request->user()?->isSuperAdmin();
         $cities = $isSuperAdmin
-            ? \App\Models\City::query()
+            ? City::query()
                 ->with('province:id,name')
                 ->orderBy('name')
                 ->get()
-                ->map(fn (\App\Models\City $c): array => [
+                ->map(fn (City $c): array => [
                     'id' => $c->id,
                     'name' => $c->name,
                     'province_name' => $c->province?->name,
@@ -98,11 +99,11 @@ class VoucherController extends Controller
     {
         $isSuperAdmin = (bool) $request->user()?->isSuperAdmin();
         $cities = $isSuperAdmin
-            ? \App\Models\City::query()
+            ? City::query()
                 ->with('province:id,name')
                 ->orderBy('name')
                 ->get()
-                ->map(fn (\App\Models\City $c): array => [
+                ->map(fn (City $c): array => [
                     'id' => $c->id,
                     'name' => $c->name,
                     'province_name' => $c->province?->name,
@@ -249,11 +250,11 @@ class VoucherController extends Controller
     {
         $isSuperAdmin = (bool) $request->user()?->isSuperAdmin();
         $cities = $isSuperAdmin
-            ? \App\Models\City::query()
+            ? City::query()
                 ->with('province:id,name')
                 ->orderBy('name')
                 ->get()
-                ->map(fn (\App\Models\City $c): array => [
+                ->map(fn (City $c): array => [
                     'id' => $c->id,
                     'name' => $c->name,
                     'province_name' => $c->province?->name,
@@ -273,7 +274,11 @@ class VoucherController extends Controller
     public function bulkStore(Request $request): RedirectResponse
     {
         $rules = [
-            'file' => ['required', 'file', 'mimes:csv,txt', 'max:5120'],
+            'file' => ['nullable', 'required_without:rows', 'file', 'mimes:csv,txt', 'max:5120'],
+            'rows' => ['nullable', 'required_without:file', 'array', 'min:1'],
+            'rows.*.serial_number' => ['required_with:rows', 'string'],
+            'rows.*.hrn' => ['required_with:rows', 'string'],
+            'rows.*.sell_price' => ['required_with:rows', 'numeric', 'min:0'],
             'margin_percentage' => ['nullable', 'numeric', 'min:0'],
         ];
 
@@ -292,24 +297,50 @@ class VoucherController extends Controller
             ? (float) $request->float('margin_percentage')
             : null;
 
-        try {
-            $rows = $this->parseCsv($request->file('file')->getRealPath());
-        } catch (Throwable $exception) {
-            throw ValidationException::withMessages([
-                'file' => 'Gagal membaca file: '.$exception->getMessage(),
-            ]);
-        }
+        if ($request->hasFile('file')) {
+            try {
+                $rows = $this->parseCsv($request->file('file')->getRealPath());
+            } catch (Throwable $exception) {
+                throw ValidationException::withMessages([
+                    'file' => 'Gagal membaca file: '.$exception->getMessage(),
+                ]);
+            }
 
-        if ($rows === []) {
-            throw ValidationException::withMessages([
-                'file' => 'File tidak memuat baris data yang valid.',
-            ]);
-        }
+            if ($rows === []) {
+                throw ValidationException::withMessages([
+                    'file' => 'File tidak memuat baris data yang valid.',
+                ]);
+            }
 
-        Storage::disk('local')->put(
-            'voucher-imports/'.now()->format('YmdHis').'-'.uniqid().'.csv',
-            $request->file('file')->getContent() ?? '',
-        );
+            Storage::disk('local')->put(
+                'voucher-imports/'.now()->format('YmdHis').'-'.uniqid().'.csv',
+                $request->file('file')->getContent() ?? '',
+            );
+        } else {
+            /** @var array<int, array{serial_number: string, hrn: string, sell_price: float}> $rawRows */
+            $rawRows = (array) $validated['rows'];
+            $rows = [];
+
+            foreach ($rawRows as $row) {
+                $serial = (string) preg_replace('/\s+/', '', trim((string) $row['serial_number']));
+                $hrn = (string) preg_replace('/\s+/', '', trim((string) $row['hrn']));
+                $sellPrice = (float) $row['sell_price'];
+
+                if ($serial !== '' && $hrn !== '') {
+                    $rows[] = [
+                        'serial_number' => $serial,
+                        'hrn' => $hrn,
+                        'sell_price' => $sellPrice,
+                    ];
+                }
+            }
+
+            if ($rows === []) {
+                throw ValidationException::withMessages([
+                    'rows' => 'Daftar voucher hasil scan kosong atau tidak valid.',
+                ]);
+            }
+        }
 
         ValidateVoucherBatchJob::dispatch($rows, $request->user()?->id, $cityIds, $marginPercentage);
 

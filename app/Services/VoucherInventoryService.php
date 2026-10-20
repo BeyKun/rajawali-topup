@@ -96,7 +96,7 @@ class VoucherInventoryService
                 'created_by' => $adminId,
             ]);
 
-            if (!empty($effectiveCityIds)) {
+            if (! empty($effectiveCityIds)) {
                 $voucher->cities()->sync($effectiveCityIds);
             }
 

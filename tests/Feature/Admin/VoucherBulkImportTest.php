@@ -1,9 +1,12 @@
 <?php
 
+use App\Models\City;
 use App\Models\Product;
+use App\Models\Province;
 use App\Models\User;
 use App\Models\Voucher;
 use Illuminate\Http\UploadedFile;
+use Inertia\Testing\AssertableInertia;
 
 beforeEach(function () {
     $this->withoutVite();
@@ -69,13 +72,13 @@ test('bulk import requires a file', function () {
 });
 
 test('super admin sees is_super_admin and cities props on bulk page', function () {
-    $province = \App\Models\Province::create(['code' => '32', 'name' => 'Jawa Barat']);
-    $city = \App\Models\City::create(['province_id' => $province->id, 'province_code' => '32', 'code' => '32.01', 'name' => 'Bogor']);
+    $province = Province::create(['code' => '32', 'name' => 'Jawa Barat']);
+    $city = City::create(['province_id' => $province->id, 'province_code' => '32', 'code' => '32.01', 'name' => 'Bogor']);
 
     $this->actingAs($this->admin)
         ->get('/admin/vouchers/bulk')
         ->assertOk()
-        ->assertInertia(fn (\Inertia\Testing\AssertableInertia $page) => $page
+        ->assertInertia(fn (AssertableInertia $page) => $page
             ->component('admin/vouchers/Bulk')
             ->where('is_super_admin', true)
             ->has('cities', 1)
@@ -83,9 +86,9 @@ test('super admin sees is_super_admin and cities props on bulk page', function (
 });
 
 test('super admin bulk import applies multiple cities to all imported vouchers', function () {
-    $province = \App\Models\Province::create(['code' => '11', 'name' => 'Aceh']);
-    $cityA = \App\Models\City::create(['province_id' => $province->id, 'province_code' => '11', 'code' => '11.01', 'name' => 'Aceh Selatan']);
-    $cityB = \App\Models\City::create(['province_id' => $province->id, 'province_code' => '11', 'code' => '11.02', 'name' => 'Aceh Singkil']);
+    $province = Province::create(['code' => '11', 'name' => 'Aceh']);
+    $cityA = City::create(['province_id' => $province->id, 'province_code' => '11', 'code' => '11.01', 'name' => 'Aceh Selatan']);
+    $cityB = City::create(['province_id' => $province->id, 'province_code' => '11', 'code' => '11.02', 'name' => 'Aceh Singkil']);
 
     $content = implode("\n", [
         'serial_number,hrn,sell_price',

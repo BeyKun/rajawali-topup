@@ -1,7 +1,9 @@
 <?php
 
 use App\Enums\VoucherStatus;
+use App\Models\City;
 use App\Models\Product;
+use App\Models\Province;
 use App\Models\User;
 use App\Models\Voucher;
 use Illuminate\Support\Facades\DB;
@@ -177,8 +179,8 @@ test('an available voucher can be deleted but a redeemed one cannot', function (
 });
 
 test('super admin sees is_super_admin and cities props on create page', function () {
-    $province = \App\Models\Province::create(['code' => '32', 'name' => 'Jawa Barat']);
-    $city = \App\Models\City::create(['province_id' => $province->id, 'province_code' => '32', 'code' => '32.01', 'name' => 'Bogor']);
+    $province = Province::create(['code' => '32', 'name' => 'Jawa Barat']);
+    $city = City::create(['province_id' => $province->id, 'province_code' => '32', 'code' => '32.01', 'name' => 'Bogor']);
 
     $this->actingAs($this->admin)
         ->get('/admin/vouchers/create')
@@ -191,10 +193,10 @@ test('super admin sees is_super_admin and cities props on create page', function
 });
 
 test('super admin can assign multiple cities to a voucher', function () {
-    $province = \App\Models\Province::create(['code' => '11', 'name' => 'Aceh']);
-    $cityA = \App\Models\City::create(['province_id' => $province->id, 'province_code' => '11', 'code' => '11.01', 'name' => 'Aceh Selatan']);
-    $cityB = \App\Models\City::create(['province_id' => $province->id, 'province_code' => '11', 'code' => '11.02', 'name' => 'Aceh Singkil']);
-    $cityC = \App\Models\City::create(['province_id' => $province->id, 'province_code' => '11', 'code' => '11.03', 'name' => 'Aceh Barat']);
+    $province = Province::create(['code' => '11', 'name' => 'Aceh']);
+    $cityA = City::create(['province_id' => $province->id, 'province_code' => '11', 'code' => '11.01', 'name' => 'Aceh Selatan']);
+    $cityB = City::create(['province_id' => $province->id, 'province_code' => '11', 'code' => '11.02', 'name' => 'Aceh Singkil']);
+    $cityC = City::create(['province_id' => $province->id, 'province_code' => '11', 'code' => '11.03', 'name' => 'Aceh Barat']);
 
     $serial = '300338120354';
     $hrn = '71125613431848001';

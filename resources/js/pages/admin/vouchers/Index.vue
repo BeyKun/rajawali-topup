@@ -488,7 +488,7 @@ function submitEdit(): void {
                                     step="any"
                                     placeholder="2"
                                     class="pr-8"
-                                    @keydown="(e) => { if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault(); }"
+                                    @keydown="(e: KeyboardEvent) => { if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault(); }"
                                     @input="onMarginInput"
                                 />
                                 <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>

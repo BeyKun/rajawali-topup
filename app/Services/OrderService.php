@@ -6,6 +6,8 @@ use App\Enums\PaymentStatus;
 use App\Enums\RedeemStatus;
 use App\Enums\VoucherStatus;
 use App\Enums\WhatsAppEvent;
+use App\Events\OrderCreated;
+use App\Events\OrderStatusUpdated;
 use App\Exceptions\OutOfStockException;
 use App\Jobs\NotifyWhatsAppChannelJob;
 use App\Models\Order;
@@ -105,6 +107,8 @@ class OrderService
             'payment_ref_id' => $invoice['transaction_id'],
         ]);
 
+        OrderCreated::dispatch($order);
+
         return $order;
     }
 
@@ -159,6 +163,7 @@ class OrderService
         }
 
         NotifyWhatsAppChannelJob::dispatchFor($order, WhatsAppEvent::Canceled);
+        OrderStatusUpdated::dispatch($order, "Pesanan {$order->order_no} dibatalkan");
 
         return $order;
     }
@@ -190,6 +195,7 @@ class OrderService
                 $this->releaseReservedVoucher($order->voucher_id);
 
                 NotifyWhatsAppChannelJob::dispatchFor($order, WhatsAppEvent::Expired);
+                OrderStatusUpdated::dispatch($order, "Pesanan {$order->order_no} kedaluwarsa");
 
                 $released++;
             }

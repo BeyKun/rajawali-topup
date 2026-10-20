@@ -1,7 +1,9 @@
 <?php
 
 use App\Enums\VoucherStatus;
+use App\Models\City;
 use App\Models\Product;
+use App\Models\Province;
 use App\Models\User;
 use App\Models\Voucher;
 use Inertia\Testing\AssertableInertia;
@@ -127,9 +129,9 @@ test('a non-admin cannot access the catalog admin screen', function () {
 });
 
 test('kabupaten/wilayah admin sees catalog summary and row stock scoped strictly to their city', function () {
-    $province = \App\Models\Province::create(['code' => '11', 'name' => 'Aceh']);
-    $cityA = \App\Models\City::create(['province_id' => $province->id, 'province_code' => '11', 'code' => '11.01', 'name' => 'Aceh Selatan']);
-    $cityB = \App\Models\City::create(['province_id' => $province->id, 'province_code' => '11', 'code' => '11.02', 'name' => 'Aceh Singkil']);
+    $province = Province::create(['code' => '11', 'name' => 'Aceh']);
+    $cityA = City::create(['province_id' => $province->id, 'province_code' => '11', 'code' => '11.01', 'name' => 'Aceh Selatan']);
+    $cityB = City::create(['province_id' => $province->id, 'province_code' => '11', 'code' => '11.02', 'name' => 'Aceh Singkil']);
     $wilayahAdmin = User::factory()->kabupatenAdmin($province->id, $cityA->id)->create();
 
     // Product 1 in City A: 1 available voucher for City A, and 1 voucher belonging to City B

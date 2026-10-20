@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -22,7 +23,7 @@ return new class extends Migration
 
         // Backfill existing vouchers that already have city_id assigned
         if (Schema::hasColumn('vouchers', 'city_id')) {
-            \Illuminate\Support\Facades\DB::table('vouchers')
+            DB::table('vouchers')
                 ->whereNotNull('city_id')
                 ->select(['id', 'city_id', 'created_at', 'updated_at'])
                 ->orderBy('id')
@@ -34,7 +35,7 @@ return new class extends Migration
                         'updated_at' => $v->updated_at ?? now(),
                     ])->all();
 
-                    \Illuminate\Support\Facades\DB::table('voucher_cities')->insertOrIgnore($records);
+                    DB::table('voucher_cities')->insertOrIgnore($records);
                 });
         }
     }

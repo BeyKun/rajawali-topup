@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\PaymentStatus;
 use App\Enums\WhatsAppEvent;
+use App\Events\OrderStatusUpdated;
 use App\Http\Controllers\Controller;
 use App\Jobs\NotifyWhatsAppChannelJob;
 use App\Jobs\ProcessVoucherRedeemJob;
@@ -80,6 +81,7 @@ class WebhookController extends Controller
 
         ProcessVoucherRedeemJob::dispatch($order);
         NotifyWhatsAppChannelJob::dispatchFor($order, WhatsAppEvent::Paid);
+        OrderStatusUpdated::dispatch($order, "Pembayaran pesanan {$order->order_no} berhasil diterima");
     }
 
     /**
@@ -97,6 +99,7 @@ class WebhookController extends Controller
 
         if ($order->payment_status === PaymentStatus::Unpaid) {
             $order->update(['payment_status' => PaymentStatus::Failed]);
+            OrderStatusUpdated::dispatch($order, "Pembayaran pesanan {$order->order_no} gagal ({$status})");
         }
     }
 

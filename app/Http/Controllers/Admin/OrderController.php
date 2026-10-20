@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Enums\PaymentStatus;
 use App\Enums\RedeemStatus;
 use App\Enums\VoucherStatus;
+use App\Events\OrderStatusUpdated;
 use App\Http\Controllers\Controller;
 use App\Jobs\ProcessVoucherRedeemJob;
 use App\Models\Order;
@@ -158,6 +159,7 @@ class OrderController extends Controller
         $order->update(['redeem_status' => RedeemStatus::Pending]);
 
         ProcessVoucherRedeemJob::dispatch($order);
+        OrderStatusUpdated::dispatch($order, "Retry redeem untuk pesanan {$order->order_no} diproses");
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Permintaan ulang redeem telah diantrikan.']);
 
@@ -190,6 +192,8 @@ class OrderController extends Controller
                 ]);
         }
 
+        OrderStatusUpdated::dispatch($order, "Pesanan {$order->order_no} dibatalkan oleh admin");
+
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Pesanan dibatalkan dan voucher dikembalikan ke stok.']);
 
         return back();
@@ -218,6 +222,8 @@ class OrderController extends Controller
             'refund_reason' => $validated['refund_reason'] ?? $order->refund_reason ?? 'Manual refund completed by admin',
             'refunded_at' => now(),
         ]);
+
+        OrderStatusUpdated::dispatch($order, "Pesanan {$order->order_no} ditandai telah direfund");
 
         Inertia::flash('toast', ['type' => 'success', 'message' => "Pesanan {$order->order_no} berhasil ditandai selesai di-refund."]);
 

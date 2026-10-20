@@ -59,9 +59,10 @@ class GoogleAuthService
                 $payload = $clientAlt->verifyIdToken($idToken);
             }
         } catch (Throwable $e) {
-            Log::warning('Google ID token verification failed with exception: ' . $e->getMessage(), [
+            Log::warning('Google ID token verification failed with exception: '.$e->getMessage(), [
                 'exception' => $e,
             ]);
+
             return null;
         }
 
@@ -69,6 +70,7 @@ class GoogleAuthService
             Log::warning('Google ID token verification returned invalid payload', [
                 'payload' => $payload,
             ]);
+
             return null;
         }
 

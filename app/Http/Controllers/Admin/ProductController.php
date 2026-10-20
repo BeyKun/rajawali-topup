@@ -61,8 +61,8 @@ class ProductController extends Controller
             ->when($stock === 'low', fn (Builder $query) => $query
                 ->whereRaw(
                     '(select count(*) from vouchers where vouchers.product_id = products.id and vouchers.status = ?'
-                    . ($cityId ? ' and (vouchers.city_id = ? or exists (select 1 from voucher_cities where voucher_cities.voucher_id = vouchers.id and voucher_cities.city_id = ?))' : '')
-                    . ') < ?',
+                    .($cityId ? ' and (vouchers.city_id = ? or exists (select 1 from voucher_cities where voucher_cities.voucher_id = vouchers.id and voucher_cities.city_id = ?))' : '')
+                    .') < ?',
                     $cityId
                         ? [VoucherStatus::Available->value, $cityId, $cityId, self::LOW_STOCK_THRESHOLD]
                         : [VoucherStatus::Available->value, self::LOW_STOCK_THRESHOLD],
@@ -70,8 +70,8 @@ class ProductController extends Controller
             ->when($stock === 'empty', fn (Builder $query) => $query
                 ->whereRaw(
                     '(select count(*) from vouchers where vouchers.product_id = products.id and vouchers.status = ?'
-                    . ($cityId ? ' and (vouchers.city_id = ? or exists (select 1 from voucher_cities where voucher_cities.voucher_id = vouchers.id and voucher_cities.city_id = ?))' : '')
-                    . ') = 0',
+                    .($cityId ? ' and (vouchers.city_id = ? or exists (select 1 from voucher_cities where voucher_cities.voucher_id = vouchers.id and voucher_cities.city_id = ?))' : '')
+                    .') = 0',
                     $cityId
                         ? [VoucherStatus::Available->value, $cityId, $cityId]
                         : [VoucherStatus::Available->value],

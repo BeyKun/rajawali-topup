@@ -6,6 +6,7 @@ use App\Enums\PaymentStatus;
 use App\Enums\RedeemStatus;
 use App\Enums\VoucherStatus;
 use App\Enums\WhatsAppEvent;
+use App\Events\OrderStatusUpdated;
 use App\Models\Order;
 use App\Models\Voucher;
 use App\Services\PaymentGatewayService;
@@ -135,6 +136,7 @@ class ProcessVoucherRedeemJob implements ShouldQueue
         ]);
 
         NotifyWhatsAppChannelJob::dispatchFor($order, WhatsAppEvent::Success);
+        OrderStatusUpdated::dispatch($order, "Redeem voucher untuk pesanan {$order->order_no} berhasil");
     }
 
     /**
@@ -188,6 +190,7 @@ class ProcessVoucherRedeemJob implements ShouldQueue
             }
 
             NotifyWhatsAppChannelJob::dispatchFor($order, WhatsAppEvent::Failed);
+            OrderStatusUpdated::dispatch($order, "Redeem voucher untuk pesanan {$order->order_no} gagal ({$result['code']})");
 
             return;
         }
