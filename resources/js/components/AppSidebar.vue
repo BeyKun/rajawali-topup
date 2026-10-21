@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { Link, usePage } from '@inertiajs/vue3';
 import {
+    BadgePercent,
     LayoutGrid,
     Package,
     Receipt,
     ShieldCheck,
+    Store,
     Ticket,
 } from '@lucide/vue';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
@@ -102,6 +104,16 @@ const mainNavItems = computed<NavItem[]>(() => {
                 title: 'Voucher',
                 href: '/admin/vouchers',
                 icon: Ticket,
+            },
+            {
+                title: 'Promo & Voucher',
+                href: '/admin/promos',
+                icon: BadgePercent,
+            },
+            {
+                title: 'User Outlet',
+                href: '/admin/outlets',
+                icon: Store,
             },
             {
                 title: 'Transaksi',

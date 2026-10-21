@@ -18,7 +18,7 @@ use Laravel\Sanctum\HasApiTokens;
 /**
  * @property int $id
  * @property string $name
- * @property string $email
+ * @property string|null $email
  * @property string|null $google_id
  * @property string|null $avatar_url
  * @property string|null $phone
@@ -96,6 +96,14 @@ class User extends Authenticatable
     public function isKabupatenAdmin(): bool
     {
         return $this->role === UserRole::KabupatenAdmin;
+    }
+
+    /**
+     * Whether this account is a mobile-app outlet customer.
+     */
+    public function isActiveCustomer(): bool
+    {
+        return $this->role === UserRole::Customer;
     }
 
     /**

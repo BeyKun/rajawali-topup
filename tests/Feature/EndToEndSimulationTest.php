@@ -57,8 +57,16 @@ test('a physical voucher flows from admin intake to telkomsel redemption end to 
     // Drop the admin session so the Sanctum token drives the mobile requests.
     $this->app['auth']->forgetGuards();
 
-    // 2. Customer authenticates with Google (mock) and receives a Sanctum token.
-    $auth = $this->postJson('/api/v1/auth/google', ['id_token' => 'rajawali-e2e-google-token'])
+    // 2. Customer authenticates with their phone number + password.
+    $customer = User::factory()->customer()->create([
+        'phone' => '6281234567890',
+        'password' => 'rajawali123',
+    ]);
+
+    $auth = $this->postJson('/api/v1/auth/login', [
+        'phone' => '081234567890',
+        'password' => 'rajawali123',
+    ])
         ->assertOk()
         ->assertJsonPath('success', true)
         ->assertJsonStructure(['success', 'token', 'user' => ['id']]);
@@ -69,6 +77,7 @@ test('a physical voucher flows from admin intake to telkomsel redemption end to 
     completeOutletProfile(User::query()->findOrFail($customerId));
 
     expect($token)->not->toBeEmpty()
+        ->and((int) $customer->id)->toBe($customerId)
         ->and(User::query()->findOrFail($customerId)->role)->toBe(UserRole::Customer);
 
     // 3. Customer fetches the catalog and sees the five available vouchers.

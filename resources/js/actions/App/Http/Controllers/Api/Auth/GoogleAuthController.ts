@@ -1,7 +1,7 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition, type RouteFormDefinition } from './../../../../../../wayfinder'
 /**
 * @see \App\Http\Controllers\Api\Auth\GoogleAuthController::store
- * @see app/Http/Controllers/Api/Auth/GoogleAuthController.php:24
+ * @see app/Http/Controllers/Api/Auth/GoogleAuthController.php:18
  * @route '/api/v1/auth/google'
  */
 export const store = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -16,7 +16,7 @@ store.definition = {
 
 /**
 * @see \App\Http\Controllers\Api\Auth\GoogleAuthController::store
- * @see app/Http/Controllers/Api/Auth/GoogleAuthController.php:24
+ * @see app/Http/Controllers/Api/Auth/GoogleAuthController.php:18
  * @route '/api/v1/auth/google'
  */
 store.url = (options?: RouteQueryOptions) => {
@@ -25,7 +25,7 @@ store.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\Api\Auth\GoogleAuthController::store
- * @see app/Http/Controllers/Api/Auth/GoogleAuthController.php:24
+ * @see app/Http/Controllers/Api/Auth/GoogleAuthController.php:18
  * @route '/api/v1/auth/google'
  */
 store.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -35,7 +35,7 @@ store.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
 
     /**
 * @see \App\Http\Controllers\Api\Auth\GoogleAuthController::store
- * @see app/Http/Controllers/Api/Auth/GoogleAuthController.php:24
+ * @see app/Http/Controllers/Api/Auth/GoogleAuthController.php:18
  * @route '/api/v1/auth/google'
  */
     const storeForm = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -45,7 +45,7 @@ store.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
 
             /**
 * @see \App\Http\Controllers\Api\Auth\GoogleAuthController::store
- * @see app/Http/Controllers/Api/Auth/GoogleAuthController.php:24
+ * @see app/Http/Controllers/Api/Auth/GoogleAuthController.php:18
  * @route '/api/v1/auth/google'
  */
         storeForm.post = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({

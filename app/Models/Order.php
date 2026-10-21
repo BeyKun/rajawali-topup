@@ -19,8 +19,11 @@ use Illuminate\Support\Carbon;
  * @property int $user_id
  * @property int $product_id
  * @property int|null $voucher_id
+ * @property int|null $promo_voucher_id
+ * @property string|null $promo_code
  * @property string $msisdn
  * @property string $amount
+ * @property string $discount_amount
  * @property string $admin_fee
  * @property string $total_amount
  * @property string $payment_channel
@@ -43,7 +46,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['order_no', 'user_id', 'product_id', 'voucher_id', 'msisdn', 'amount', 'admin_fee', 'total_amount', 'payment_channel', 'channel', 'channel_ref', 'payment_status', 'redeem_status', 'qris_string', 'qris_url', 'qris_expired_at', 'payment_ref_id', 'paid_at', 'refund_amount', 'refund_ref_id', 'refund_reason', 'refunded_at', 'redeem_response_code', 'redeem_response_raw', 'retry_count'])]
+#[Fillable(['order_no', 'user_id', 'product_id', 'voucher_id', 'promo_voucher_id', 'promo_code', 'msisdn', 'amount', 'discount_amount', 'admin_fee', 'total_amount', 'payment_channel', 'channel', 'channel_ref', 'payment_status', 'redeem_status', 'qris_string', 'qris_url', 'qris_expired_at', 'payment_ref_id', 'paid_at', 'refund_amount', 'refund_ref_id', 'refund_reason', 'refunded_at', 'redeem_response_code', 'redeem_response_raw', 'retry_count'])]
 class Order extends Model
 {
     /** @use HasFactory<OrderFactory> */
@@ -58,6 +61,7 @@ class Order extends Model
     {
         return [
             'amount' => 'decimal:2',
+            'discount_amount' => 'decimal:2',
             'admin_fee' => 'decimal:2',
             'total_amount' => 'decimal:2',
             'refund_amount' => 'decimal:2',
@@ -85,6 +89,11 @@ class Order extends Model
     public function voucher(): BelongsTo
     {
         return $this->belongsTo(Voucher::class);
+    }
+
+    public function promoVoucher(): BelongsTo
+    {
+        return $this->belongsTo(PromoVoucher::class);
     }
 
     /**

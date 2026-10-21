@@ -23,6 +23,7 @@ class CreateOrderRequest extends ApiFormRequest
                 Rule::exists(Product::class, 'id')->where('is_active', true),
             ],
             'msisdn' => ['required', 'string', new TelkomselMsisdn],
+            'promo_code' => ['nullable', 'string', 'max:50'],
         ];
     }
 
@@ -39,6 +40,8 @@ class CreateOrderRequest extends ApiFormRequest
             'product_id.exists' => 'Paket data tidak ditemukan atau sedang tidak tersedia.',
             'msisdn.required' => 'Nomor HP tujuan wajib diisi.',
             'msisdn.string' => 'Nomor HP tujuan tidak valid.',
+            'promo_code.string' => 'Kode promo tidak valid.',
+            'promo_code.max' => 'Kode promo maksimal 50 karakter.',
         ];
     }
 }

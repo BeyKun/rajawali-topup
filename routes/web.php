@@ -3,7 +3,11 @@
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\KabupatenAdminController;
 use App\Http\Controllers\Admin\OrderController;
+use App\Http\Controllers\Admin\OutletUserController;
 use App\Http\Controllers\Admin\ProductController;
+use App\Http\Controllers\Admin\PromoBannerController;
+use App\Http\Controllers\Admin\PromoController;
+use App\Http\Controllers\Admin\PromoVoucherController;
 use App\Http\Controllers\Admin\RegionController;
 use App\Http\Controllers\Admin\TelkomselAreaController;
 use App\Http\Controllers\Admin\VoucherController;
@@ -44,6 +48,24 @@ Route::middleware(['auth', 'verified', 'admin'])
         Route::delete('vouchers/{voucher}', [VoucherController::class, 'destroy'])->name('vouchers.destroy');
         Route::get('vouchers/bulk', [VoucherController::class, 'bulk'])->name('vouchers.bulk');
         Route::post('vouchers/bulk', [VoucherController::class, 'bulkStore'])->name('vouchers.bulk.store');
+
+        Route::get('outlets', [OutletUserController::class, 'index'])->name('outlets.index');
+        Route::post('outlets', [OutletUserController::class, 'store'])->name('outlets.store');
+        Route::put('outlets/{user}', [OutletUserController::class, 'update'])->name('outlets.update');
+        Route::post('outlets/{user}/reset-password', [OutletUserController::class, 'resetPassword'])->name('outlets.reset-password');
+
+        Route::get('promos', [PromoController::class, 'index'])->name('promos.index');
+
+        Route::prefix('promos/banners')->name('promos.banners.')->group(function (): void {
+            Route::post('/', [PromoBannerController::class, 'store'])->name('store');
+            Route::post('{banner}', [PromoBannerController::class, 'update'])->name('update');
+            Route::delete('{banner}', [PromoBannerController::class, 'destroy'])->name('destroy');
+        });
+        Route::prefix('promos/vouchers')->name('promos.vouchers.')->group(function (): void {
+            Route::post('/', [PromoVoucherController::class, 'store'])->name('store');
+            Route::put('{voucher}', [PromoVoucherController::class, 'update'])->name('update');
+            Route::delete('{voucher}', [PromoVoucherController::class, 'destroy'])->name('destroy');
+        });
 
         Route::get('orders', [OrderController::class, 'index'])->name('orders.index');
         Route::get('orders/{order}', [OrderController::class, 'show'])->name('orders.show');

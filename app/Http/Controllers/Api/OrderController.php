@@ -43,6 +43,7 @@ class OrderController extends Controller
             $user,
             (int) $request->validated('product_id'),
             (string) $request->validated('msisdn'),
+            $request->validated('promo_code'),
         );
 
         $order->loadMissing('product');

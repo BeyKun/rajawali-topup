@@ -8,10 +8,12 @@ use App\Enums\VoucherStatus;
 use App\Enums\WhatsAppEvent;
 use App\Events\OrderCreated;
 use App\Events\OrderStatusUpdated;
+use App\Exceptions\InvalidPromoCodeException;
 use App\Exceptions\OutOfStockException;
 use App\Jobs\NotifyWhatsAppChannelJob;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\PromoVoucher;
 use App\Models\User;
 use App\Models\Voucher;
 use App\Support\Phone;
@@ -29,7 +31,10 @@ use Throwable;
  */
 class OrderService
 {
-    public function __construct(private readonly PaymentGatewayService $paymentGateway) {}
+    public function __construct(
+        private readonly PaymentGatewayService $paymentGateway,
+        private readonly PromoVoucherService $promoVouchers,
+    ) {}
 
     /**
      * Create an unpaid order and reserve one available voucher for it.
@@ -43,16 +48,22 @@ class OrderService
      *     lock is not held for the duration of an external HTTP call, which would
      *     serialise every concurrent order for the same product.
      *
+     * An optional promo code is validated and locked inside the same transaction
+     * (so a quota-limited promo is never over-redeemed); `total_amount` stores
+     * the amount actually charged after the discount, and the QRIS invoice is
+     * created for that discounted amount.
+     *
      * If the gateway fails the reservation is rolled back so the voucher returns
      * to the sellable pool.
      *
      * @throws OutOfStockException When no voucher is available for the product.
+     * @throws InvalidPromoCodeException When the promo code cannot be applied.
      */
-    public function createOrder(User $user, int $productId, string $msisdn): Order
+    public function createOrder(User $user, int $productId, string $msisdn, ?string $promoCode = null): Order
     {
         $normalizedMsisdn = Phone::normalizeTo62($msisdn);
 
-        $order = DB::transaction(function () use ($user, $productId, $normalizedMsisdn): Order {
+        $order = DB::transaction(function () use ($user, $productId, $normalizedMsisdn, $promoCode): Order {
             $product = Product::query()->findOrFail($productId);
 
             /** @var Voucher|null $voucher */
@@ -67,20 +78,34 @@ class OrderService
                 throw new OutOfStockException('Stok paket data ini sedang kosong.');
             }
 
+            $amount = (float) $product->sell_price;
+
+            /** @var PromoVoucher|null $promoVoucher */
+            $promoVoucher = $this->promoVouchers->lockForOrder($promoCode, $amount);
+
+            $discount = $promoVoucher?->discountFor($amount) ?? 0.0;
+
             $voucher->update([
                 'status' => VoucherStatus::Reserved,
                 'reserved_at' => now(),
             ]);
+
+            if ($promoVoucher !== null) {
+                $promoVoucher->increment('used_count');
+            }
 
             return Order::query()->create([
                 'order_no' => $this->generateOrderNo(),
                 'user_id' => $user->id,
                 'product_id' => $productId,
                 'voucher_id' => $voucher->id,
+                'promo_voucher_id' => $promoVoucher?->id,
+                'promo_code' => $promoVoucher?->code,
                 'msisdn' => $normalizedMsisdn,
-                'amount' => $product->sell_price,
+                'amount' => $amount,
+                'discount_amount' => $discount,
                 'admin_fee' => '0',
-                'total_amount' => $product->sell_price,
+                'total_amount' => max(0, $amount - $discount),
                 'payment_channel' => 'QRIS',
                 'payment_status' => PaymentStatus::Unpaid,
                 'redeem_status' => RedeemStatus::Pending,
@@ -90,7 +115,7 @@ class OrderService
         try {
             $invoice = $this->paymentGateway->createQrisInvoice([
                 'order_no' => $order->order_no,
-                'amount' => $order->amount,
+                'amount' => (float) $order->total_amount,
                 'customer_name' => $user->name,
                 'msisdn' => $normalizedMsisdn,
             ]);
@@ -146,6 +171,7 @@ class OrderService
             ]);
 
             $this->releaseReservedVoucher($locked->voucher_id);
+            $this->releasePromoQuota($locked->promo_voucher_id);
 
             return true;
         });
@@ -193,6 +219,7 @@ class OrderService
                 ]);
 
                 $this->releaseReservedVoucher($order->voucher_id);
+                $this->releasePromoQuota($order->promo_voucher_id);
 
                 NotifyWhatsAppChannelJob::dispatchFor($order, WhatsAppEvent::Expired);
                 OrderStatusUpdated::dispatch($order, "Pesanan {$order->order_no} kedaluwarsa");
@@ -213,6 +240,7 @@ class OrderService
     protected function discardFailedCheckout(Order $order): void
     {
         $this->releaseReservedVoucher($order->voucher_id);
+        $this->releasePromoQuota($order->promo_voucher_id);
 
         $order->delete();
     }
@@ -237,6 +265,24 @@ class OrderService
                 'status' => VoucherStatus::Available->value,
                 'reserved_at' => null,
             ]);
+    }
+
+    /**
+     * Give back one unit of promo quota after a discount is reversed.
+     *
+     * Called whenever an unpaid order is canceled, expires, or fails to reach
+     * the gateway, so a quota-limited promo is not silently consumed.
+     */
+    protected function releasePromoQuota(?int $promoVoucherId): void
+    {
+        if ($promoVoucherId === null) {
+            return;
+        }
+
+        PromoVoucher::query()
+            ->whereKey($promoVoucherId)
+            ->where('used_count', '>', 0)
+            ->decrement('used_count');
     }
 
     /**

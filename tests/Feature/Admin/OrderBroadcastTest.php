@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Models\Voucher;
 use App\Services\OrderService;
 use App\Services\PaymentGatewayService;
+use App\Services\PromoVoucherService;
 use Illuminate\Support\Facades\Event;
 
 it('dispatches OrderCreated event when order is created', function () {
@@ -29,7 +30,7 @@ it('dispatches OrderCreated event when order is created', function () {
             'transaction_id' => 'TRX-12345',
         ]);
 
-    $orderService = new OrderService($paymentGateway);
+    $orderService = new OrderService($paymentGateway, new PromoVoucherService);
     $order = $orderService->createOrder($user, $product->id, '081234567890');
 
     Event::assertDispatched(OrderCreated::class, function (OrderCreated $event) use ($order) {
@@ -53,7 +54,7 @@ it('dispatches OrderStatusUpdated event when order is cancelled', function () {
     $paymentGateway = Mockery::mock(PaymentGatewayService::class);
     $paymentGateway->shouldReceive('cancelQrisInvoice')->with('TRX-999')->once();
 
-    $orderService = new OrderService($paymentGateway);
+    $orderService = new OrderService($paymentGateway, new PromoVoucherService);
     $orderService->cancelOrder($order);
 
     Event::assertDispatched(OrderStatusUpdated::class, function (OrderStatusUpdated $event) use ($order) {
