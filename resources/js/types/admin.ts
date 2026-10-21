@@ -208,8 +208,13 @@ export type DiscountType = 'fixed' | 'percentage';
 export type AdminPromoBanner = {
     id: number;
     title: string;
+    description: string | null;
     image_path: string;
     image_url: string;
+    slider_image_path?: string | null;
+    slider_image_url?: string | null;
+    popup_image_path?: string | null;
+    popup_image_url?: string | null;
     target_url: string | null;
     is_active: boolean;
     is_featured: boolean;

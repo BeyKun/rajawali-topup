@@ -32,7 +32,7 @@ test('the banner endpoint returns only active banners in order', function () {
         ->assertJsonPath('data.0.is_featured', false)
         ->assertJsonPath('data.1.id', $second->id)
         ->assertJsonPath('data.1.is_featured', true)
-        ->assertJsonStructure(['data' => [['id', 'title', 'image_url', 'target_url', 'is_featured', 'sort_order']]]);
+        ->assertJsonStructure(['data' => [['id', 'title', 'description', 'image_url', 'slider_image_url', 'popup_image_url', 'target_url', 'is_featured', 'sort_order']]]);
 });
 
 test('the promo list returns only vouchers that are usable now', function () {

@@ -145,3 +145,36 @@ test('edit voucher validates duplicate serial number', function () {
 
     $response->assertSessionHasErrors('serial_number');
 });
+
+test('admin cannot update voucher that has been redeemed', function () {
+    $voucher = Voucher::factory()->create([
+        'product_id' => $this->product->id,
+        'serial_number' => '111122223333',
+        'status' => VoucherStatus::Redeemed,
+    ]);
+
+    $response = $this->actingAs($this->admin)
+        ->put("/admin/vouchers/{$voucher->id}", [
+            'serial_number' => '111122223333',
+            'sell_price' => 20000,
+            'status' => 'AVAILABLE',
+        ]);
+
+    $response->assertSessionHasErrors('voucher');
+    $voucher->refresh();
+    expect($voucher->status)->toBe(VoucherStatus::Redeemed);
+});
+
+test('admin cannot delete voucher that has been redeemed', function () {
+    $voucher = Voucher::factory()->create([
+        'product_id' => $this->product->id,
+        'serial_number' => '111122223333',
+        'status' => VoucherStatus::Redeemed,
+    ]);
+
+    $response = $this->actingAs($this->admin)
+        ->delete("/admin/vouchers/{$voucher->id}");
+
+    $response->assertSessionHasErrors('voucher');
+    expect(Voucher::query()->whereKey($voucher->id)->exists())->toBeTrue();
+});

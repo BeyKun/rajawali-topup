@@ -254,7 +254,15 @@ function onCsvChange(event: Event): void {
 function submitCsv(): void {
     csvForm.city_ids = selectedCityIds.value;
     csvForm.margin_percentage = marginPercentage.value || undefined;
-    csvForm.post('/admin/vouchers/bulk', { forceFormData: true });
+    csvForm.post('/admin/vouchers/bulk', {
+        forceFormData: true,
+        onError: (errors) => {
+            const firstErr = Object.values(errors)[0];
+            if (firstErr) {
+                toast.error(firstErr as string);
+            }
+        },
+    });
 }
 
 function downloadTemplate(): void {

@@ -52,8 +52,13 @@ class PromoController extends Controller
         return [
             'id' => $banner->id,
             'title' => $banner->title,
+            'description' => $banner->description,
             'image_path' => $banner->image_path,
             'image_url' => Storage::disk('public')->url($banner->image_path),
+            'slider_image_path' => $banner->image_path,
+            'slider_image_url' => Storage::disk('public')->url($banner->image_path),
+            'popup_image_path' => $banner->popup_image_path,
+            'popup_image_url' => $banner->popup_image_path ? Storage::disk('public')->url($banner->popup_image_path) : null,
             'target_url' => $banner->target_url,
             'is_active' => $banner->is_active,
             'is_featured' => $banner->is_featured,

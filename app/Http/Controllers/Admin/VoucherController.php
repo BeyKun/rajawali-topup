@@ -125,7 +125,22 @@ class VoucherController extends Controller
      */
     public function check(VoucherCheckRequest $request): JsonResponse
     {
-        $result = $this->telkomsel->checkVoucher($request->string('serial_number')->toString());
+        $serialNumber = $request->string('serial_number')->toString();
+
+        if (Voucher::query()->where('serial_number', $serialNumber)->exists()) {
+            return response()->json([
+                'name' => null,
+                'description' => null,
+                'validity' => null,
+                'expired_date' => null,
+                'region' => null,
+                'status_code' => 0,
+                'is_valid' => false,
+                'status_message' => "Voucher dengan serial number {$serialNumber} sudah pernah ada di inventori.",
+            ]);
+        }
+
+        $result = $this->telkomsel->checkVoucher($serialNumber);
 
         return response()->json([
             'name' => $result['name'],
@@ -183,6 +198,12 @@ class VoucherController extends Controller
      */
     public function update(VoucherUpdateRequest $request, Voucher $voucher): RedirectResponse
     {
+        if ($voucher->status === VoucherStatus::Redeemed) {
+            throw ValidationException::withMessages([
+                'voucher' => 'Voucher yang sudah diredeem tidak dapat diedit.',
+            ]);
+        }
+
         if ($request->user()?->isKabupatenAdmin()) {
             $userCityId = $request->user()->city_id;
             $hasAccess = $voucher->city_id === $userCityId || $voucher->cities()->where('cities.id', $userCityId)->exists();
@@ -340,6 +361,41 @@ class VoucherController extends Controller
                     'rows' => 'Daftar voucher hasil scan kosong atau tidak valid.',
                 ]);
             }
+        }
+
+        $errorKey = $request->hasFile('file') ? 'file' : 'rows';
+        $serials = array_column($rows, 'serial_number');
+
+        // Cek duplikasi di dalam input / file yang diunggah itu sendiri
+        $counts = array_count_values($serials);
+        $duplicatesInInput = array_keys(array_filter($counts, fn (int $count): bool => $count > 1));
+
+        if (! empty($duplicatesInInput)) {
+            $formattedDuplicates = implode(', ', array_slice($duplicatesInInput, 0, 5));
+            if (count($duplicatesInInput) > 5) {
+                $formattedDuplicates .= ' (+ ' . (count($duplicatesInInput) - 5) . ' lainnya)';
+            }
+
+            throw ValidationException::withMessages([
+                $errorKey => "Terdapat nomor seri yang terduplikasi di dalam data import: {$formattedDuplicates}.",
+            ]);
+        }
+
+        // Cek apakah ada nomor seri yang sudah pernah ada di database
+        $existingSerials = Voucher::query()
+            ->whereIn('serial_number', $serials)
+            ->pluck('serial_number')
+            ->all();
+
+        if (! empty($existingSerials)) {
+            $formattedExisting = implode(', ', array_slice($existingSerials, 0, 5));
+            if (count($existingSerials) > 5) {
+                $formattedExisting .= ' (+ ' . (count($existingSerials) - 5) . ' lainnya)';
+            }
+
+            throw ValidationException::withMessages([
+                $errorKey => "Voucher dengan nomor seri berikut sudah pernah ada di inventori: {$formattedExisting}.",
+            ]);
         }
 
         ValidateVoucherBatchJob::dispatch($rows, $request->user()?->id, $cityIds, $marginPercentage);

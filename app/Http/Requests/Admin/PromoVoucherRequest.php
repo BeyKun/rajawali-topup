@@ -49,7 +49,15 @@ class PromoVoucherRequest extends FormRequest
             'title' => ['required', 'string', 'max:150'],
             'description' => ['nullable', 'string', 'max:1000'],
             'discount_type' => ['required', Rule::enum(DiscountType::class)],
-            'discount_value' => ['required', 'numeric', 'min:0.01'],
+            'discount_value' => [
+                'required',
+                'numeric',
+                'min:0.01',
+                Rule::when(
+                    $this->input('discount_type') === DiscountType::Percentage->value,
+                    ['max:100']
+                ),
+            ],
             'max_discount_amount' => ['nullable', 'numeric', 'min:0'],
             'min_spend' => ['nullable', 'numeric', 'min:0'],
             'usage_limit' => ['nullable', 'integer', 'min:1'],
@@ -76,6 +84,7 @@ class PromoVoucherRequest extends FormRequest
             'discount_value.required' => 'Besaran diskon wajib diisi.',
             'discount_value.numeric' => 'Besaran diskon harus berupa angka.',
             'discount_value.min' => 'Besaran diskon harus lebih besar dari 0.',
+            'discount_value.max' => 'Besaran diskon persentase maksimal 100%.',
             'max_discount_amount.numeric' => 'Batas maksimal diskon harus berupa angka.',
             'min_spend.numeric' => 'Minimal belanja harus berupa angka.',
             'usage_limit.integer' => 'Kuota pemakaian harus berupa angka bulat.',

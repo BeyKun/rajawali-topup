@@ -34,7 +34,7 @@ test('bulk import stores only the valid rows', function () {
     expect((float) $product->sell_price)->toBe(25000.0);
 });
 
-test('bulk import skips duplicate serials already in inventory', function () {
+test('bulk import rejects batch if serials already exist in inventory', function () {
     $product = Product::factory()->create();
 
     Voucher::factory()->create([
@@ -52,9 +52,25 @@ test('bulk import skips duplicate serials already in inventory', function () {
 
     $this->actingAs($this->admin)
         ->post('/admin/vouchers/bulk', ['file' => $file])
-        ->assertRedirect('/admin/vouchers');
+        ->assertSessionHasErrors(['file' => 'Voucher dengan nomor seri berikut sudah pernah ada di inventori: 300338120354.']);
 
-    expect(Voucher::query()->count())->toBe(2);
+    expect(Voucher::query()->count())->toBe(1);
+});
+
+test('bulk import rejects batch if file contains duplicate serial numbers', function () {
+    $content = implode("\n", [
+        'serial_number,hrn,sell_price',
+        '300338120356,71125613431848001,25000',
+        '300338120356,71125613431848002,25000',
+    ]);
+
+    $file = UploadedFile::fake()->createWithContent('vouchers.csv', $content);
+
+    $this->actingAs($this->admin)
+        ->post('/admin/vouchers/bulk', ['file' => $file])
+        ->assertSessionHasErrors(['file' => 'Terdapat nomor seri yang terduplikasi di dalam data import: 300338120356.']);
+
+    expect(Voucher::query()->count())->toBe(0);
 });
 
 test('bulk import rejects a file without valid rows', function () {

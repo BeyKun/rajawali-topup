@@ -121,6 +121,9 @@ const editForm = useForm({
 });
 
 function openEdit(voucher: AdminVoucher): void {
+    if (voucher.status === 'REDEEMED') {
+        return;
+    }
     editingVoucher.value = voucher;
     editForm.clearErrors();
     editForm.serial_number = formatSerialNumber(voucher.serial_number);
@@ -357,6 +360,7 @@ function submitEdit(): void {
                         <td class="px-4 py-3 text-right">
                             <div class="flex items-center justify-end gap-1">
                                 <Button
+                                    v-if="voucher.status !== 'REDEEMED'"
                                     variant="ghost"
                                     size="icon-sm"
                                     aria-label="Edit Voucher"
@@ -366,6 +370,13 @@ function submitEdit(): void {
                                         class="size-4 text-muted-foreground hover:text-foreground"
                                     />
                                 </Button>
+                                <span
+                                    v-else
+                                    class="text-xs text-muted-foreground italic px-2"
+                                    title="Voucher yang sudah diredeem tidak dapat diedit atau dihapus"
+                                >
+                                    Terkunci
+                                </span>
                                 <Dialog v-if="voucher.status === 'AVAILABLE'">
                                     <DialogTrigger as-child>
                                         <Button

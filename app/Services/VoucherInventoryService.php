@@ -111,6 +111,12 @@ class VoucherInventoryService
      */
     public function deleteAvailableVoucher(Voucher $voucher): void
     {
+        if ($voucher->status === VoucherStatus::Redeemed) {
+            throw ValidationException::withMessages([
+                'voucher' => 'Voucher yang sudah diredeem tidak dapat dihapus.',
+            ]);
+        }
+
         if ($voucher->status !== VoucherStatus::Available) {
             throw ValidationException::withMessages([
                 'voucher' => 'Hanya voucher berstatus TERSEDIA yang dapat dihapus.',

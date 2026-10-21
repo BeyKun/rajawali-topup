@@ -252,3 +252,40 @@ test('negative margin percentage is rejected by validation', function () {
         ])
         ->assertSessionHasErrors('margin_percentage');
 });
+
+test('check endpoint returns invalid if voucher serial already exists in database', function () {
+    $product = Product::factory()->create();
+    Voucher::factory()->create([
+        'product_id' => $product->id,
+        'serial_number' => '300338120354',
+    ]);
+
+    $response = $this->actingAs($this->admin)
+        ->postJson('/admin/vouchers/check', [
+            'serial_number' => '300338120354',
+        ]);
+
+    $response->assertOk()
+        ->assertJson([
+            'is_valid' => false,
+            'status_message' => 'Voucher dengan serial number 300338120354 sudah pernah ada di inventori.',
+        ]);
+});
+
+test('store voucher fails validation when serial_number already exists in database', function () {
+    $product = Product::factory()->create();
+    Voucher::factory()->create([
+        'product_id' => $product->id,
+        'serial_number' => '300338120354',
+    ]);
+
+    $this->actingAs($this->admin)
+        ->post('/admin/vouchers', [
+            'serial_number' => '300338120354',
+            'hrn' => '71125613431848001',
+            'sell_price' => 25000,
+        ])
+        ->assertSessionHasErrors([
+            'serial_number' => 'Voucher dengan nomor seri ini sudah pernah ditambahkan ke inventori.',
+        ]);
+});

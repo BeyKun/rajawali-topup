@@ -12,7 +12,9 @@ use Illuminate\Support\Carbon;
 /**
  * @property int $id
  * @property string $title
+ * @property string|null $description
  * @property string $image_path
+ * @property string|null $popup_image_path
  * @property string|null $target_url
  * @property bool $is_active
  * @property bool $is_featured
@@ -20,7 +22,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['title', 'image_path', 'target_url', 'is_active', 'is_featured', 'sort_order'])]
+#[Fillable(['title', 'description', 'image_path', 'popup_image_path', 'target_url', 'is_active', 'is_featured', 'sort_order'])]
 class PromoBanner extends Model
 {
     /** @use HasFactory<PromoBannerFactory> */

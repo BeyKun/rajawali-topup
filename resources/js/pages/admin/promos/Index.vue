@@ -55,14 +55,18 @@ const editingBanner = ref<AdminPromoBanner | null>(null);
 
 const bannerForm = useForm<{
     title: string;
+    description: string;
     image: File | null;
+    popup_image: File | null;
     target_url: string;
     is_active: boolean;
     is_featured: boolean;
     sort_order: number;
 }>({
     title: '',
+    description: '',
     image: null,
+    popup_image: null,
     target_url: '',
     is_active: true,
     is_featured: false,
@@ -80,7 +84,9 @@ function openBannerEdit(banner: AdminPromoBanner): void {
     editingBanner.value = banner;
     bannerForm.clearErrors();
     bannerForm.title = banner.title;
+    bannerForm.description = banner.description ?? '';
     bannerForm.image = null;
+    bannerForm.popup_image = null;
     bannerForm.target_url = banner.target_url ?? '';
     bannerForm.is_active = banner.is_active;
     bannerForm.is_featured = banner.is_featured ?? false;
@@ -91,6 +97,11 @@ function openBannerEdit(banner: AdminPromoBanner): void {
 function onBannerFile(event: Event): void {
     const target = event.target as HTMLInputElement;
     bannerForm.image = target.files?.[0] ?? null;
+}
+
+function onPopupBannerFile(event: Event): void {
+    const target = event.target as HTMLInputElement;
+    bannerForm.popup_image = target.files?.[0] ?? null;
 }
 
 function submitBanner(): void {
@@ -261,34 +272,48 @@ function destroyVoucher(voucher: AdminPromoVoucher): void {
                 <div
                     v-for="banner in props.banners"
                     :key="banner.id"
-                    class="overflow-hidden rounded-xl border"
+                    class="flex flex-col justify-between overflow-hidden rounded-xl border bg-card"
                 >
-                    <div class="relative aspect-[16/7] bg-muted">
-                        <img
-                            :src="banner.image_url"
-                            :alt="banner.title"
-                            class="size-full object-cover"
-                        />
-                        <span
-                            v-if="banner.is_featured"
-                            class="absolute top-2 left-2 flex items-center gap-1 rounded-md bg-amber-500/90 px-2 py-0.5 text-xs font-semibold text-white shadow-sm backdrop-blur-xs"
-                        >
-                            ⭐ Featured / Popup
-                        </span>
-                    </div>
-                    <div class="flex items-center justify-between gap-2 p-3">
-                        <div class="min-w-0">
-                            <p class="truncate text-sm font-medium">
-                                {{ banner.title }}
-                            </p>
-                            <p class="text-xs text-muted-foreground">
-                                Urutan {{ banner.sort_order }} ·
-                                {{ banner.is_active ? 'Aktif' : 'Nonaktif' }}
+                    <div>
+                        <div class="relative aspect-[16/7] bg-muted">
+                            <img
+                                :src="banner.image_url"
+                                :alt="banner.title"
+                                class="size-full object-cover"
+                            />
+                            <div class="absolute top-2 left-2 flex flex-wrap gap-1">
                                 <span
                                     v-if="banner.is_featured"
-                                    class="font-medium text-amber-600 dark:text-amber-400"
+                                    class="flex items-center gap-1 rounded-md bg-amber-500/90 px-2 py-0.5 text-xs font-semibold text-white shadow-sm backdrop-blur-xs"
                                 >
-                                    · Popup Mobile
+                                    ⭐ Featured / Popup
+                                </span>
+                                <span
+                                    v-if="banner.popup_image_url"
+                                    class="flex items-center gap-1 rounded-md bg-sky-600/90 px-2 py-0.5 text-xs font-semibold text-white shadow-sm backdrop-blur-xs"
+                                >
+                                    📱 Portrait Ready
+                                </span>
+                            </div>
+                        </div>
+                        <div class="p-3">
+                            <p class="truncate text-sm font-semibold">
+                                {{ banner.title }}
+                            </p>
+                            <p
+                                v-if="banner.description"
+                                class="mt-1 line-clamp-2 text-xs text-muted-foreground"
+                            >
+                                {{ banner.description }}
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between gap-2 border-t bg-muted/20 p-3">
+                        <div class="min-w-0">
+                            <p class="text-xs text-muted-foreground">
+                                Urutan {{ banner.sort_order }} ·
+                                <span :class="banner.is_active ? 'font-medium text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'">
+                                    {{ banner.is_active ? 'Aktif' : 'Nonaktif' }}
                                 </span>
                             </p>
                         </div>
@@ -337,6 +362,7 @@ function destroyVoucher(voucher: AdminPromoVoucher): void {
                         <tr>
                             <th class="px-4 py-3 font-medium">Kode</th>
                             <th class="px-4 py-3 font-medium">Judul</th>
+                            <th class="px-4 py-3 font-medium">Tipe</th>
                             <th class="px-4 py-3 font-medium">Diskon</th>
                             <th class="px-4 py-3 font-medium">Min. Belanja</th>
                             <th class="px-4 py-3 font-medium">Kuota</th>
@@ -355,6 +381,22 @@ function destroyVoucher(voucher: AdminPromoVoucher): void {
                                 {{ voucher.code }}
                             </td>
                             <td class="px-4 py-3">{{ voucher.title }}</td>
+                            <td class="px-4 py-3">
+                                <span
+                                    class="rounded-full px-2 py-0.5 text-xs font-medium"
+                                    :class="
+                                        voucher.discount_type === 'percentage'
+                                            ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400'
+                                            : 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                                    "
+                                >
+                                    {{
+                                        voucher.discount_type === 'percentage'
+                                            ? 'Persentase'
+                                            : 'Nominal'
+                                    }}
+                                </span>
+                            </td>
                             <td class="px-4 py-3">
                                 <span v-if="voucher.discount_type === 'percentage'">
                                     {{ voucher.discount_value }}%
@@ -415,7 +457,7 @@ function destroyVoucher(voucher: AdminPromoVoucher): void {
                         </tr>
                         <tr v-if="props.promoVouchers.length === 0">
                             <td
-                                colspan="8"
+                                colspan="9"
                                 class="px-4 py-12 text-center text-muted-foreground"
                             >
                                 <BadgePercent class="mx-auto mb-2 size-8 opacity-40" />
@@ -429,33 +471,58 @@ function destroyVoucher(voucher: AdminPromoVoucher): void {
 
         <!-- Dialog Banner -->
         <Dialog v-model:open="bannerDialog">
-            <DialogContent>
+            <DialogContent class="max-h-[90vh] overflow-y-auto sm:max-w-lg">
                 <DialogHeader>
                     <DialogTitle>
                         {{ editingBanner ? 'Edit Banner' : 'Tambah Banner Promo' }}
                     </DialogTitle>
                     <DialogDescription>
-                        Banner tampil di carousel halaman utama aplikasi mobile.
+                        Banner promo untuk carousel beranda dan popup utama aplikasi mobile.
                     </DialogDescription>
                 </DialogHeader>
 
                 <div class="grid gap-4">
                     <div class="grid gap-2">
-                        <Label for="banner_title">Judul</Label>
-                        <Input id="banner_title" v-model="bannerForm.title" />
+                        <Label for="banner_title">Judul Banner</Label>
+                        <Input
+                            id="banner_title"
+                            v-model="bannerForm.title"
+                            placeholder="Contoh: Promo Spesial Weekend"
+                        />
                         <InputError :message="bannerForm.errors.title" />
                     </div>
 
                     <div class="grid gap-2">
-                        <Label for="banner_image">
-                            Gambar
-                            <span
-                                v-if="editingBanner"
-                                class="text-xs font-normal text-muted-foreground"
-                            >
-                                (kosongkan bila tidak diubah)
+                        <Label for="banner_description">Deskripsi Promo (opsional)</Label>
+                        <textarea
+                            id="banner_description"
+                            v-model="bannerForm.description"
+                            rows="3"
+                            placeholder="Tuliskan keterangan lengkap promo, syarat & ketentuan, atau keuntungan penawaran ini..."
+                            class="border-input focus-visible:ring-ring w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs focus-visible:ring-2 focus-visible:outline-none"
+                        ></textarea>
+                        <InputError :message="bannerForm.errors.description" />
+                    </div>
+
+                    <!-- Upload Gambar 1: Banner Slider (Landscape) -->
+                    <div class="grid gap-2 rounded-lg border bg-muted/20 p-3">
+                        <div class="flex items-center justify-between gap-2">
+                            <Label for="banner_image" class="font-semibold">
+                                Gambar Slider
+                                <span
+                                    v-if="editingBanner"
+                                    class="text-xs font-normal text-muted-foreground"
+                                >
+                                    (kosongkan bila tidak diubah)
+                                </span>
+                            </Label>
+                            <span class="rounded bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                                Disarankan Landscape (16:9 / 2:1)
                             </span>
-                        </Label>
+                        </div>
+                        <p class="text-xs text-muted-foreground">
+                            Ditampilkan di carousel slider halaman beranda. Ukuran rekomendasi: 1200 x 600 px (Landscape).
+                        </p>
                         <Input
                             id="banner_image"
                             type="file"
@@ -463,6 +530,56 @@ function destroyVoucher(voucher: AdminPromoVoucher): void {
                             @change="onBannerFile"
                         />
                         <InputError :message="bannerForm.errors.image" />
+                        <div
+                            v-if="editingBanner?.image_url"
+                            class="mt-1 flex items-center gap-2 text-xs text-muted-foreground"
+                        >
+                            <span>Preview saat ini:</span>
+                            <img
+                                :src="editingBanner.image_url"
+                                alt="Slider Preview"
+                                class="h-10 w-20 rounded border object-cover"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- Upload Gambar 2: Banner Popup (Portrait) -->
+                    <div class="grid gap-2 rounded-lg border bg-muted/20 p-3">
+                        <div class="flex items-center justify-between gap-2">
+                            <Label for="banner_popup_image" class="font-semibold">
+                                Gambar Popup / Featured (opsional)
+                                <span
+                                    v-if="editingBanner"
+                                    class="text-xs font-normal text-muted-foreground"
+                                >
+                                    (kosongkan bila tidak diubah)
+                                </span>
+                            </Label>
+                            <span class="rounded bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
+                                Diharapkan Portrait (9:16 / 3:4)
+                            </span>
+                        </div>
+                        <p class="text-xs text-muted-foreground">
+                            Ditampilkan saat dialog popup featured muncul di aplikasi mobile. Ukuran rekomendasi: 720 x 1280 px (Portrait).
+                        </p>
+                        <Input
+                            id="banner_popup_image"
+                            type="file"
+                            accept="image/*"
+                            @change="onPopupBannerFile"
+                        />
+                        <InputError :message="bannerForm.errors.popup_image" />
+                        <div
+                            v-if="editingBanner?.popup_image_url"
+                            class="mt-1 flex items-center gap-2 text-xs text-muted-foreground"
+                        >
+                            <span>Preview saat ini:</span>
+                            <img
+                                :src="editingBanner.popup_image_url"
+                                alt="Popup Preview"
+                                class="h-14 w-9 rounded border object-cover"
+                            />
+                        </div>
                     </div>
 
                     <div class="grid gap-2">
@@ -581,14 +698,14 @@ function destroyVoucher(voucher: AdminPromoVoucher): void {
 
                     <div class="grid grid-cols-2 gap-4">
                         <div class="grid gap-2">
-                            <Label for="voucher_type">Jenis Diskon</Label>
+                            <Label for="voucher_type">Tipe Potongan Diskon</Label>
                             <Select v-model="voucherForm.discount_type">
                                 <SelectTrigger id="voucher_type">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="fixed">Nominal (Rp)</SelectItem>
-                                    <SelectItem value="percentage">Persentase (%)</SelectItem>
+                                    <SelectItem value="fixed">Potongan Nominal (Rp)</SelectItem>
+                                    <SelectItem value="percentage">Potongan Persentase (%)</SelectItem>
                                 </SelectContent>
                             </Select>
                             <InputError :message="voucherForm.errors.discount_type" />
@@ -601,7 +718,7 @@ function destroyVoucher(voucher: AdminPromoVoucher): void {
                                 id="voucher_value"
                                 v-model="voucherForm.discount_value"
                                 inputmode="numeric"
-                                :placeholder="isPercentage ? '10' : '5000'"
+                                :placeholder="isPercentage ? '10 (1-100%)' : '5000'"
                             />
                             <InputError :message="voucherForm.errors.discount_value" />
                         </div>

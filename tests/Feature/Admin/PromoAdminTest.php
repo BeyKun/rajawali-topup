@@ -242,6 +242,56 @@ test('an admin can delete a promo voucher', function () {
     $this->assertDatabaseMissing('promo_vouchers', ['id' => $voucher->id]);
 });
 
+test('an admin can upload a promo banner with slider image, popup image, and description', function () {
+    $this->actingAs($this->admin)
+        ->post('/admin/promos/banners', [
+            'title' => 'Promo Merdeka',
+            'description' => 'Diskon spesial hari kemerdekaan untuk semua kuota.',
+            'image' => UploadedFile::fake()->image('slider.jpg', 1200, 600),
+            'popup_image' => UploadedFile::fake()->image('popup.jpg', 720, 1280),
+            'target_url' => 'https://example.test/merdeka',
+            'is_active' => true,
+            'is_featured' => true,
+            'sort_order' => 1,
+        ])
+        ->assertRedirect('/admin/promos');
+
+    $banner = PromoBanner::query()->where('title', 'Promo Merdeka')->sole();
+
+    expect($banner->description)->toBe('Diskon spesial hari kemerdekaan untuk semua kuota.')
+        ->and($banner->is_active)->toBeTrue()
+        ->and($banner->is_featured)->toBeTrue()
+        ->and($banner->popup_image_path)->not->toBeNull();
+
+    Storage::disk('public')->assertExists($banner->image_path);
+    Storage::disk('public')->assertExists($banner->popup_image_path);
+});
+
+test('deleting a banner removes both slider and popup image files', function () {
+    $banner = PromoBanner::factory()->create([
+        'popup_image_path' => 'promo-banners/fake-popup.jpg',
+    ]);
+    Storage::disk('public')->put($banner->image_path, 'fake-slider');
+    Storage::disk('public')->put($banner->popup_image_path, 'fake-popup');
+
+    $this->actingAs($this->admin)
+        ->delete("/admin/promos/banners/{$banner->id}")
+        ->assertRedirect('/admin/promos');
+
+    $this->assertDatabaseMissing('promo_banners', ['id' => $banner->id]);
+    Storage::disk('public')->assertMissing($banner->image_path);
+    Storage::disk('public')->assertMissing($banner->popup_image_path);
+});
+
+test('a percentage promo voucher rejects discount_value over 100', function () {
+    $this->actingAs($this->admin)
+        ->post('/admin/promos/vouchers', promoVoucherPayload([
+            'discount_type' => DiscountType::Percentage->value,
+            'discount_value' => 101,
+        ]))
+        ->assertSessionHasErrors('discount_value');
+});
+
 test('guests cannot manage promo banners or vouchers', function () {
     $banner = PromoBanner::factory()->create();
     $voucher = PromoVoucher::factory()->create();

@@ -23,6 +23,9 @@ class PromoBannerController extends Controller
     public function store(PromoBannerRequest $request): RedirectResponse
     {
         $path = $this->storeOptimizedImage($request->file('image'));
+        $popupPath = $request->hasFile('popup_image')
+            ? $this->storeOptimizedImage($request->file('popup_image'))
+            : null;
 
         $isFeatured = $request->boolean('is_featured');
         if ($isFeatured) {
@@ -31,7 +34,9 @@ class PromoBannerController extends Controller
 
         PromoBanner::query()->create([
             'title' => $request->string('title')->toString(),
+            'description' => $request->string('description')->toString() ?: null,
             'image_path' => $path,
+            'popup_image_path' => $popupPath,
             'target_url' => $request->string('target_url')->toString() ?: null,
             'is_active' => $request->boolean('is_active', true),
             'is_featured' => $isFeatured,
@@ -44,7 +49,7 @@ class PromoBannerController extends Controller
     }
 
     /**
-     * Update a promo banner, replacing the image only when a new one is sent.
+     * Update a promo banner, replacing images only when new ones are sent.
      */
     public function update(PromoBannerRequest $request, PromoBanner $banner): RedirectResponse
     {
@@ -55,6 +60,7 @@ class PromoBannerController extends Controller
 
         $attributes = [
             'title' => $request->string('title')->toString(),
+            'description' => $request->string('description')->toString() ?: null,
             'target_url' => $request->string('target_url')->toString() ?: null,
             'is_active' => $request->boolean('is_active', true),
             'is_featured' => $isFeatured,
@@ -66,6 +72,13 @@ class PromoBannerController extends Controller
             $attributes['image_path'] = $this->storeOptimizedImage($request->file('image'));
         }
 
+        if ($request->hasFile('popup_image')) {
+            if ($banner->popup_image_path) {
+                Storage::disk('public')->delete($banner->popup_image_path);
+            }
+            $attributes['popup_image_path'] = $this->storeOptimizedImage($request->file('popup_image'));
+        }
+
         $banner->update($attributes);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Banner promo berhasil diperbarui.']);
@@ -74,11 +87,14 @@ class PromoBannerController extends Controller
     }
 
     /**
-     * Delete a promo banner and its stored image.
+     * Delete a promo banner and its stored images.
      */
     public function destroy(PromoBanner $banner): RedirectResponse
     {
         Storage::disk('public')->delete($banner->image_path);
+        if ($banner->popup_image_path) {
+            Storage::disk('public')->delete($banner->popup_image_path);
+        }
 
         $banner->delete();
 
