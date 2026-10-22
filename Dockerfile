@@ -58,36 +58,44 @@ RUN npm run build
 # ==============================================================================
 # Stage 3: Production Runtime (PHP 8.4-FPM + Nginx)
 # ==============================================================================
-FROM php:8.4-fpm-bookworm AS production
+FROM php:8.4.27-fpm-alpine AS production
 
 LABEL maintainer="Rajawali Topup"
 
-ENV DEBIAN_FRONTEND=noninteractive \
-    TZ=Asia/Jakarta
+ENV TZ=Asia/Jakarta
 
 # Use official PHP production configuration as baseline
 RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
 
 # Install system runtime dependencies, Nginx, Supervisor
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apk add --no-cache \
     nginx \
     supervisor \
     curl \
     zip \
     unzip \
     git \
-    libpq-dev \
-    libpng-dev \
-    libjpeg62-turbo-dev \
-    libfreetype6-dev \
-    libzip-dev \
-    libicu-dev \
-    libonig-dev \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+    tzdata \
+    libpq \
+    libpng \
+    libjpeg-turbo \
+    freetype \
+    libzip \
+    icu-libs \
+    oniguruma
 
-# Configure and install PHP extensions
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
+# Configure and install PHP extensions, then remove temporary build dependencies
+RUN apk add --no-cache --virtual .build-deps \
+    $PHPIZE_DEPS \
+    postgresql-dev \
+    libpng-dev \
+    libjpeg-turbo-dev \
+    freetype-dev \
+    libzip-dev \
+    icu-dev \
+    oniguruma-dev \
+    linux-headers \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) \
         pdo_pgsql \
         pgsql \
@@ -98,19 +106,21 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
         bcmath \
         exif \
         pcntl \
-        opcache
-
-# Install and enable Redis extension
-RUN pecl install redis \
+        opcache \
+    && pecl install redis \
     && docker-php-ext-enable redis \
+    && apk del .build-deps \
     && rm -rf /tmp/pear /tmp/* /var/tmp/*
 
 # Copy Composer binary from official image for runtime artisan/package operations
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 # Copy custom configurations
-COPY docker/nginx.conf /etc/nginx/sites-available/default
-RUN ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
+COPY docker/nginx.conf /etc/nginx/http.d/default.conf
+
+# Configure Nginx worker user to www-data and ensure supervisor directories exist
+RUN sed -i 's/user nginx;/user www-data;/' /etc/nginx/nginx.conf \
+    && mkdir -p /var/log/supervisor /etc/supervisor/conf.d
 
 COPY docker/php.ini /usr/local/etc/php/conf.d/99-custom.ini
 COPY docker/opcache.ini /usr/local/etc/php/conf.d/opcache.ini
