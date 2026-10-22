@@ -37,10 +37,10 @@ FROM node:22-bookworm-slim AS frontend-builder
 WORKDIR /app
 
 # Copy package definitions first for optimal layer caching
-COPY package*.json ./
+COPY package*.json .npmrc* ./
 
 # Use npm ci for deterministic, secure, and fast clean installs
-RUN npm ci --prefer-offline --no-audit --progress=false
+RUN npm ci --prefer-offline --no-audit --progress=false --legacy-peer-deps
 
 # Copy source code
 COPY . .
