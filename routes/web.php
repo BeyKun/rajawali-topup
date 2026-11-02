@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\PromoVoucherController;
 use App\Http\Controllers\Admin\RegionController;
 use App\Http\Controllers\Admin\TelkomselAreaController;
 use App\Http\Controllers\Admin\VoucherController;
+use App\Http\Controllers\Admin\VoucherOcrController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -48,6 +49,7 @@ Route::middleware(['auth', 'verified', 'admin'])
         Route::delete('vouchers/{voucher}', [VoucherController::class, 'destroy'])->name('vouchers.destroy');
         Route::get('vouchers/bulk', [VoucherController::class, 'bulk'])->name('vouchers.bulk');
         Route::post('vouchers/bulk', [VoucherController::class, 'bulkStore'])->name('vouchers.bulk.store');
+        Route::post('vouchers/scan-photo', [VoucherOcrController::class, 'scanPhoto'])->name('vouchers.scan-photo');
 
         Route::get('outlets', [OutletUserController::class, 'index'])->name('outlets.index');
         Route::post('outlets', [OutletUserController::class, 'store'])->name('outlets.store');

@@ -5,6 +5,8 @@ services:
       dockerfile: Dockerfile
     container_name: rajawali_topup
     restart: unless-stopped
+    depends_on:
+      - ocr-service
     env_file:
       - .env
     environment:
@@ -14,6 +16,19 @@ services:
     volumes:
       - rajawali_storage_app:/var/www/html/storage/app
       - rajawali_storage_logs:/var/www/html/storage/logs
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - nginx-proxy-manager_default
+
+  ocr-service:
+    build:
+      context: ./ocr-service
+      dockerfile: Dockerfile
+    container_name: rajawali_ocr
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
     security_opt:
       - no-new-privileges:true
     networks:

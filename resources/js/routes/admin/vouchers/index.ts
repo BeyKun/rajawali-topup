@@ -522,6 +522,61 @@ bulk.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
         })
     
     bulk.form = bulkForm
+/**
+* @see \App\Http\Controllers\Admin\VoucherOcrController::scanPhoto
+ * @see app/Http/Controllers/Admin/VoucherOcrController.php:20
+ * @route '/admin/vouchers/scan-photo'
+ */
+export const scanPhoto = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
+    url: scanPhoto.url(options),
+    method: 'post',
+})
+
+scanPhoto.definition = {
+    methods: ["post"],
+    url: '/admin/vouchers/scan-photo',
+} satisfies RouteDefinition<["post"]>
+
+/**
+* @see \App\Http\Controllers\Admin\VoucherOcrController::scanPhoto
+ * @see app/Http/Controllers/Admin/VoucherOcrController.php:20
+ * @route '/admin/vouchers/scan-photo'
+ */
+scanPhoto.url = (options?: RouteQueryOptions) => {
+    return scanPhoto.definition.url + queryParams(options)
+}
+
+/**
+* @see \App\Http\Controllers\Admin\VoucherOcrController::scanPhoto
+ * @see app/Http/Controllers/Admin/VoucherOcrController.php:20
+ * @route '/admin/vouchers/scan-photo'
+ */
+scanPhoto.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
+    url: scanPhoto.url(options),
+    method: 'post',
+})
+
+    /**
+* @see \App\Http\Controllers\Admin\VoucherOcrController::scanPhoto
+ * @see app/Http/Controllers/Admin/VoucherOcrController.php:20
+ * @route '/admin/vouchers/scan-photo'
+ */
+    const scanPhotoForm = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
+        action: scanPhoto.url(options),
+        method: 'post',
+    })
+
+            /**
+* @see \App\Http\Controllers\Admin\VoucherOcrController::scanPhoto
+ * @see app/Http/Controllers/Admin/VoucherOcrController.php:20
+ * @route '/admin/vouchers/scan-photo'
+ */
+        scanPhotoForm.post = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
+            action: scanPhoto.url(options),
+            method: 'post',
+        })
+    
+    scanPhoto.form = scanPhotoForm
 const vouchers = {
     index: Object.assign(index, index),
 create: Object.assign(create, create),
@@ -530,6 +585,7 @@ store: Object.assign(store, store),
 update: Object.assign(update, update),
 destroy: Object.assign(destroy, destroy),
 bulk: Object.assign(bulk, bulk36930f),
+scanPhoto: Object.assign(scanPhoto, scanPhoto),
 }
 
 export default vouchers

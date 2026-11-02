@@ -1,6 +1,7 @@
 import DashboardController from './DashboardController'
 import ProductController from './ProductController'
 import VoucherController from './VoucherController'
+import VoucherOcrController from './VoucherOcrController'
 import OutletUserController from './OutletUserController'
 import PromoController from './PromoController'
 import PromoBannerController from './PromoBannerController'
@@ -13,6 +14,7 @@ const Admin = {
     DashboardController: Object.assign(DashboardController, DashboardController),
 ProductController: Object.assign(ProductController, ProductController),
 VoucherController: Object.assign(VoucherController, VoucherController),
+VoucherOcrController: Object.assign(VoucherOcrController, VoucherOcrController),
 OutletUserController: Object.assign(OutletUserController, OutletUserController),
 PromoController: Object.assign(PromoController, PromoController),
 PromoBannerController: Object.assign(PromoBannerController, PromoBannerController),

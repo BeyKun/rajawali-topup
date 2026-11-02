@@ -82,46 +82,141 @@ function onPhotoSelected(event: Event): void {
     startOcrScan(file);
 }
 
+function getXsrfToken(): string {
+    const match = document.cookie.match(new RegExp('(^|;\\s*)(?:XSRF-TOKEN)=([^;]*)'));
+    return match ? decodeURIComponent(match[2]) : '';
+}
+
+function scanPhotoWithServerOcr(
+    file: File,
+    onProgress: (p: OcrProgress) => void,
+): Promise<{ vouchers: ScannedVoucherRow[]; raw_texts?: string[] }> {
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/admin/vouchers/scan-photo');
+        xhr.responseType = 'json';
+
+        const token = getXsrfToken();
+        if (token) {
+            xhr.setRequestHeader('X-XSRF-TOKEN', token);
+        }
+        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+
+        xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+                const pct = 0.1 + (e.loaded / e.total) * 0.4;
+                onProgress({
+                    status: 'Mengunggah foto voucher ke server OCR...',
+                    progress: Math.min(pct, 0.5),
+                });
+            }
+        };
+
+        xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                const res = xhr.response;
+                if (res && res.success) {
+                    resolve({
+                        vouchers: res.vouchers || [],
+                        raw_texts: res.raw_texts || [],
+                    });
+                } else {
+                    reject(new Error(res?.message || 'Gagal memproses gambar pada server OCR.'));
+                }
+            } else {
+                const errDetail = xhr.response?.message || `Server OCR error (HTTP ${xhr.status})`;
+                reject(new Error(errDetail));
+            }
+        };
+
+        xhr.onerror = () => {
+            reject(new Error('Koneksi jaringan ke endpoint OCR gagal.'));
+        };
+
+        xhr.onreadystatechange = () => {
+            if (xhr.readyState === XMLHttpRequest.LOADING) {
+                onProgress({
+                    status: 'Memindai angka & nomor seri dengan RapidOCR...',
+                    progress: 0.8,
+                });
+            }
+        };
+
+        const formData = new FormData();
+        formData.append('image', file);
+        onProgress({ status: 'Mempersiapkan pengunggahan...', progress: 0.1 });
+        xhr.send(formData);
+    });
+}
+
 async function startOcrScan(file: File): Promise<void> {
     isScanning.value = true;
-    scanProgress.value = { status: 'Memulai OCR & optimasi gambar...', progress: 0.05 };
+    scanProgress.value = { status: 'Memulai OCR server...', progress: 0.05 };
     rawOcrText.value = '';
 
     try {
-        const rows = await scanVoucherImage(
-            file,
-            (p) => {
-                scanProgress.value = p;
-            },
-            {
-                autoContrast: autoContrast.value,
-                scaleIfNeeded: true,
-                rawTextCallback: (txt) => {
-                    rawOcrText.value = txt;
-                },
-            },
-        );
+        // Step 1: Attempt Server-side RapidOCR (High precision)
+        const serverResult = await scanPhotoWithServerOcr(file, (p) => {
+            scanProgress.value = p;
+        });
 
-        if (rows.rawText) {
-            rawOcrText.value = rows.rawText;
+        if (serverResult.raw_texts && serverResult.raw_texts.length > 0) {
+            rawOcrText.value = serverResult.raw_texts.join('\n');
         }
 
-        // Set default price and format with spaces for easy reading
-        scannedRows.value = rows.map((r) => ({
+        scannedRows.value = serverResult.vouchers.map((r) => ({
             ...r,
             serial_number: formatSerialNumber(r.serial_number),
             hrn: formatHrn(r.hrn),
             sell_price: defaultBatchPrice.value,
         }));
 
+        scanProgress.value = { status: 'Selesai!', progress: 1 };
+
         if (scannedRows.value.length > 0) {
-            toast.success(`Berhasil mendeteksi ${scannedRows.value.length} voucher dari foto!`);
+            toast.success(`Berhasil mendeteksi ${scannedRows.value.length} voucher dengan RapidOCR!`);
         } else {
             toast.warning('Tidak ada voucher yang terdeteksi secara otomatis. Silakan periksa ketajaman foto atau tambah baris manual.');
         }
-    } catch (err) {
-        console.error('OCR Error:', err);
-        toast.error('Gagal memindai foto voucher. Pastikan gambar jelas dan tidak buram.');
+    } catch (serverErr) {
+        console.warn('Server OCR failed or unavailable, falling back to local Tesseract:', serverErr);
+        toast.info('Layanan OCR server tidak merespon, beralih ke scanner browser lokal...');
+
+        try {
+            const rows = await scanVoucherImage(
+                file,
+                (p) => {
+                    scanProgress.value = p;
+                },
+                {
+                    autoContrast: autoContrast.value,
+                    scaleIfNeeded: true,
+                    rawTextCallback: (txt) => {
+                        rawOcrText.value = txt;
+                    },
+                },
+            );
+
+            if (rows.rawText) {
+                rawOcrText.value = rows.rawText;
+            }
+
+            scannedRows.value = rows.map((r) => ({
+                ...r,
+                serial_number: formatSerialNumber(r.serial_number),
+                hrn: formatHrn(r.hrn),
+                sell_price: defaultBatchPrice.value,
+            }));
+
+            if (scannedRows.value.length > 0) {
+                toast.success(`Berhasil mendeteksi ${scannedRows.value.length} voucher dari foto!`);
+            } else {
+                toast.warning('Tidak ada voucher yang terdeteksi secara otomatis. Silakan periksa ketajaman foto atau tambah baris manual.');
+            }
+        } catch (localErr) {
+            console.error('All OCR attempts failed:', localErr);
+            toast.error('Gagal memindai foto voucher. Pastikan gambar jelas dan tidak buram.');
+        }
     } finally {
         isScanning.value = false;
     }
@@ -532,7 +627,7 @@ function downloadTemplate(): void {
                         class="border-b bg-muted/20 p-4 space-y-1.5"
                     >
                         <div class="flex items-center justify-between text-xs text-muted-foreground font-medium">
-                            <span>Teks Mentah Hasil Pemindaian Tesseract:</span>
+                            <span>Teks Mentah Hasil Pemindaian OCR (RapidOCR):</span>
                             <span>{{ rawOcrText.length }} karakter</span>
                         </div>
                         <pre class="max-h-48 overflow-y-auto rounded-lg border bg-background/80 p-3 font-mono text-[11px] leading-relaxed select-all whitespace-pre-wrap text-foreground/90">{{ rawOcrText }}</pre>

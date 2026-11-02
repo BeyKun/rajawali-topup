@@ -46,4 +46,9 @@ return [
         'mock' => filter_var(env('GOOGLE_MOCK', empty(env('GOOGLE_CLIENT_ID'))), FILTER_VALIDATE_BOOL),
     ],
 
+    'ocr' => [
+        'url' => env('OCR_SERVICE_URL', 'http://ocr-service:8000'),
+        'timeout' => (int) env('OCR_SERVICE_TIMEOUT', 30),
+    ],
+
 ];
