@@ -118,9 +118,11 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 # Copy custom configurations
 COPY docker/nginx.conf /etc/nginx/http.d/default.conf
 
-# Configure Nginx worker user to www-data and ensure supervisor directories exist
+# Configure Nginx worker user to www-data, ensure permissions on Nginx tmp & logs, and ensure supervisor directories exist
 RUN sed -i 's/user nginx;/user www-data;/' /etc/nginx/nginx.conf \
-    && mkdir -p /var/log/supervisor /etc/supervisor/conf.d
+    && mkdir -p /var/log/supervisor /etc/supervisor/conf.d \
+    && mkdir -p /var/lib/nginx/tmp/client_body /var/lib/nginx/tmp/proxy /var/lib/nginx/tmp/fastcgi /var/lib/nginx/tmp/uwsgi /var/lib/nginx/tmp/scgi /var/log/nginx \
+    && chown -R www-data:www-data /var/lib/nginx /var/log/nginx
 
 COPY docker/php.ini /usr/local/etc/php/conf.d/99-custom.ini
 COPY docker/opcache.ini /usr/local/etc/php/conf.d/opcache.ini

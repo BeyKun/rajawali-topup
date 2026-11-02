@@ -17,6 +17,15 @@ rm -f /var/www/html/bootstrap/cache/packages.php \
       /var/www/html/bootstrap/cache/routes-v7.php \
       /var/www/html/bootstrap/cache/events.php
 
+# Ensure Nginx temporary buffer directories and logs are owned by www-data
+mkdir -p /var/lib/nginx/tmp/client_body \
+         /var/lib/nginx/tmp/proxy \
+         /var/lib/nginx/tmp/fastcgi \
+         /var/lib/nginx/tmp/uwsgi \
+         /var/lib/nginx/tmp/scgi \
+         /var/log/nginx
+chown -R www-data:www-data /var/lib/nginx /var/log/nginx
+
 touch /var/www/html/storage/logs/laravel.log
 chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
