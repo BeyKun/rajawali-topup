@@ -27,8 +27,8 @@ services:
       dockerfile: Dockerfile
     container_name: rajawali_ocr
     restart: unless-stopped
-    ports:
-      - "8000:8000"
+    # ports:
+    #   - "8000:8000"
     security_opt:
       - no-new-privileges:true
     networks:
