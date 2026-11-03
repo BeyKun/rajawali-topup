@@ -52,7 +52,7 @@ test('a physical voucher flows from admin intake to telkomsel redemption end to 
     $product = Product::query()->sole();
 
     expect(Voucher::query()->where('product_id', $product->id)->count())->toBe(5)
-        ->and((float) $product->sell_price)->toBe(25000.0);
+        ->and((float) $product->sell_price)->toBe(25500.0);
 
     // Drop the admin session so the Sanctum token drives the mobile requests.
     $this->app['auth']->forgetGuards();
@@ -102,7 +102,7 @@ test('a physical voucher flows from admin intake to telkomsel redemption end to 
         ->assertJsonPath('success', true)
         ->assertJsonPath('data.msisdn', '6282233456777')
         ->assertJsonPath('data.product_name', $product->name)
-        ->assertJsonPath('data.total_amount', 25000)
+        ->assertJsonPath('data.total_amount', 25500)
         ->assertJsonStructure(['data' => ['order_no', 'msisdn', 'product_name', 'total_amount', 'qris_string', 'qris_url', 'expired_at']]);
 
     $orderNo = (string) $created->json('data.order_no');

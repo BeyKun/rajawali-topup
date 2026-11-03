@@ -46,7 +46,10 @@ const props = defineProps<{
     discountTypes: DiscountType[];
 }>();
 
-const activeTab = ref<'banners' | 'vouchers'>('banners');
+const activeTab = ref<'banners' | 'popups' | 'vouchers'>('banners');
+
+const sliderBanners = computed(() => props.banners.filter((b) => !b.is_featured));
+const popupBanners = computed(() => props.banners.filter((b) => b.is_featured));
 
 /* ----------------------------- Banner CRUD ----------------------------- */
 
@@ -73,24 +76,27 @@ const bannerForm = useForm<{
     sort_order: 0,
 });
 
-function openBannerCreate(): void {
+function openBannerCreate(isPopup = false): void {
     editingBanner.value = null;
     bannerForm.reset();
     bannerForm.clearErrors();
+    bannerForm.title = '';
+    bannerForm.description = '';
+    bannerForm.is_featured = isPopup;
     bannerDialog.value = true;
 }
 
 function openBannerEdit(banner: AdminPromoBanner): void {
     editingBanner.value = banner;
     bannerForm.clearErrors();
-    bannerForm.title = banner.title;
-    bannerForm.description = banner.description ?? '';
+    bannerForm.title = banner.title || '';
+    bannerForm.description = banner.description != null ? String(banner.description) : '';
     bannerForm.image = null;
     bannerForm.popup_image = null;
-    bannerForm.target_url = banner.target_url ?? '';
-    bannerForm.is_active = banner.is_active;
-    bannerForm.is_featured = banner.is_featured ?? false;
-    bannerForm.sort_order = banner.sort_order;
+    bannerForm.target_url = banner.target_url || '';
+    bannerForm.is_active = !!banner.is_active;
+    bannerForm.is_featured = !!banner.is_featured;
+    bannerForm.sort_order = Number(banner.sort_order) || 0;
     bannerDialog.value = true;
 }
 
@@ -225,8 +231,8 @@ function destroyVoucher(voucher: AdminPromoVoucher): void {
 <template>
     <div class="flex h-full flex-1 flex-col gap-4 p-4">
         <Heading
-            title="Promo & Voucher"
-            description="Kelola banner promo aplikasi mobile dan kode voucher diskon transaksi."
+            title="Promo"
+            description="Kelola banner promo carousel dan popup banner aplikasi mobile."
         />
 
         <!-- Tabs -->
@@ -244,6 +250,23 @@ function destroyVoucher(voucher: AdminPromoVoucher): void {
                 <ImageIcon class="mr-1.5 inline size-4" />
                 Banner Promo
             </button>
+
+            <!-- Poin 15: Tab Popup Banner dipisah dari Banner Promo -->
+            <button
+                type="button"
+                class="border-b-2 px-4 py-2 text-sm font-medium transition"
+                :class="
+                    activeTab === 'popups'
+                        ? 'border-primary text-foreground'
+                        : 'border-transparent text-muted-foreground hover:text-foreground'
+                "
+                @click="activeTab = 'popups'"
+            >
+                <span class="mr-1.5">⭐</span>
+                Popup Banner
+            </button>
+
+            <!-- Poin 13: Tab Voucher Promo dihide (dikomentari, jangan dihapus)
             <button
                 type="button"
                 class="border-b-2 px-4 py-2 text-sm font-medium transition"
@@ -257,20 +280,24 @@ function destroyVoucher(voucher: AdminPromoVoucher): void {
                 <BadgePercent class="mr-1.5 inline size-4" />
                 Voucher Promo
             </button>
+            -->
         </div>
 
-        <!-- Banner Tab -->
+        <!-- Tab 1: Banner Promo (Slider) -->
         <div v-if="activeTab === 'banners'" class="flex flex-col gap-4">
-            <div class="flex justify-end">
-                <Button @click="openBannerCreate">
+            <div class="flex justify-between items-center">
+                <p class="text-xs text-muted-foreground">
+                    Banner slider landscape yang tampil di bagian atas beranda aplikasi.
+                </p>
+                <Button @click="openBannerCreate(false)">
                     <Plus class="size-4" />
-                    Tambah Banner
+                    Tambah Banner Promo
                 </Button>
             </div>
 
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div
-                    v-for="banner in props.banners"
+                    v-for="banner in sliderBanners"
                     :key="banner.id"
                     class="flex flex-col justify-between overflow-hidden rounded-xl border bg-card"
                 >
@@ -281,18 +308,86 @@ function destroyVoucher(voucher: AdminPromoVoucher): void {
                                 :alt="banner.title"
                                 class="size-full object-cover"
                             />
-                            <div class="absolute top-2 left-2 flex flex-wrap gap-1">
-                                <span
-                                    v-if="banner.is_featured"
-                                    class="flex items-center gap-1 rounded-md bg-amber-500/90 px-2 py-0.5 text-xs font-semibold text-white shadow-sm backdrop-blur-xs"
-                                >
-                                    ⭐ Featured / Popup
+                        </div>
+                        <div class="p-3">
+                            <p class="truncate text-sm font-semibold">
+                                {{ banner.title }}
+                            </p>
+                            <p
+                                v-if="banner.description"
+                                class="mt-1 line-clamp-2 text-xs text-muted-foreground"
+                            >
+                                {{ banner.description }}
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between gap-2 border-t bg-muted/20 p-3">
+                        <div class="min-w-0">
+                            <p class="text-xs text-muted-foreground">
+                                Urutan {{ banner.sort_order }} ·
+                                <span :class="banner.is_active ? 'font-medium text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'">
+                                    {{ banner.is_active ? 'Aktif' : 'Nonaktif' }}
                                 </span>
-                                <span
-                                    v-if="banner.popup_image_url"
-                                    class="flex items-center gap-1 rounded-md bg-sky-600/90 px-2 py-0.5 text-xs font-semibold text-white shadow-sm backdrop-blur-xs"
-                                >
-                                    📱 Portrait Ready
+                            </p>
+                        </div>
+                        <div class="flex shrink-0 items-center gap-1">
+                            <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                aria-label="Edit"
+                                @click="openBannerEdit(banner)"
+                            >
+                                <Pencil class="size-4" />
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                aria-label="Hapus"
+                                @click="destroyBanner(banner)"
+                            >
+                                <Trash2 class="size-4 text-destructive" />
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+                <div
+                    v-if="sliderBanners.length === 0"
+                    class="col-span-full rounded-xl border py-12 text-center text-muted-foreground"
+                >
+                    <ImageIcon class="mx-auto mb-2 size-8 opacity-40" />
+                    Belum ada banner promo slider.
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 2: Popup Banner -->
+        <div v-else-if="activeTab === 'popups'" class="flex flex-col gap-4">
+            <div class="flex justify-between items-center">
+                <p class="text-xs text-muted-foreground">
+                    Banner popup portrait/featured yang tampil saat pengguna membuka aplikasi.
+                </p>
+                <Button @click="openBannerCreate(true)">
+                    <Plus class="size-4" />
+                    Tambah Popup Banner
+                </Button>
+            </div>
+
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div
+                    v-for="banner in popupBanners"
+                    :key="banner.id"
+                    class="flex flex-col justify-between overflow-hidden rounded-xl border bg-card"
+                >
+                    <div>
+                        <div class="relative aspect-[16/9] bg-muted flex items-center justify-center">
+                            <img
+                                :src="banner.popup_image_url || banner.image_url"
+                                :alt="banner.title"
+                                class="size-full object-cover"
+                            />
+                            <div class="absolute top-2 left-2 flex flex-wrap gap-1">
+                                <span class="flex items-center gap-1 rounded-md bg-amber-500/90 px-2 py-0.5 text-xs font-semibold text-white shadow-sm backdrop-blur-xs">
+                                    ⭐ Popup Aktif
                                 </span>
                             </div>
                         </div>
@@ -338,17 +433,17 @@ function destroyVoucher(voucher: AdminPromoVoucher): void {
                     </div>
                 </div>
                 <div
-                    v-if="props.banners.length === 0"
+                    v-if="popupBanners.length === 0"
                     class="col-span-full rounded-xl border py-12 text-center text-muted-foreground"
                 >
                     <ImageIcon class="mx-auto mb-2 size-8 opacity-40" />
-                    Belum ada banner promo.
+                    Belum ada popup banner.
                 </div>
             </div>
         </div>
 
-        <!-- Voucher Tab -->
-        <div v-else class="flex flex-col gap-4">
+        <!-- Poin 13: Tab Voucher Promo dihide (dikomentari, jangan dihapus)
+        <div v-else-if="activeTab === 'vouchers'" class="flex flex-col gap-4">
             <div class="flex justify-end">
                 <Button @click="openVoucherCreate">
                     <Plus class="size-4" />
@@ -468,16 +563,17 @@ function destroyVoucher(voucher: AdminPromoVoucher): void {
                 </table>
             </div>
         </div>
+        -->
 
         <!-- Dialog Banner -->
         <Dialog v-model:open="bannerDialog">
             <DialogContent class="max-h-[90vh] overflow-y-auto sm:max-w-lg">
                 <DialogHeader>
                     <DialogTitle>
-                        {{ editingBanner ? 'Edit Banner' : 'Tambah Banner Promo' }}
+                        {{ editingBanner ? (bannerForm.is_featured ? 'Edit Popup Banner' : 'Edit Banner Promo') : (bannerForm.is_featured ? 'Tambah Popup Banner' : 'Tambah Banner Promo') }}
                     </DialogTitle>
                     <DialogDescription>
-                        Banner promo untuk carousel beranda dan popup utama aplikasi mobile.
+                        {{ bannerForm.is_featured ? 'Banner popup yang tampil secara modal ketika pengguna membuka aplikasi.' : 'Banner promo untuk carousel slider beranda aplikasi mobile.' }}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -496,19 +592,20 @@ function destroyVoucher(voucher: AdminPromoVoucher): void {
                         <Label for="banner_description">Deskripsi Promo (opsional)</Label>
                         <textarea
                             id="banner_description"
-                            v-model="bannerForm.description"
+                            :value="bannerForm.description"
                             rows="3"
                             placeholder="Tuliskan keterangan lengkap promo, syarat & ketentuan, atau keuntungan penawaran ini..."
                             class="border-input focus-visible:ring-ring w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs focus-visible:ring-2 focus-visible:outline-none"
+                            @input="bannerForm.description = ($event.target as HTMLTextAreaElement).value"
                         ></textarea>
                         <InputError :message="bannerForm.errors.description" />
                     </div>
 
-                    <!-- Upload Gambar 1: Banner Slider (Landscape) -->
-                    <div class="grid gap-2 rounded-lg border bg-muted/20 p-3">
+                    <!-- Upload Gambar Khusus Banner Promo (Landscape) -->
+                    <div v-if="!bannerForm.is_featured" class="grid gap-2 rounded-lg border bg-muted/20 p-3">
                         <div class="flex items-center justify-between gap-2">
                             <Label for="banner_image" class="font-semibold">
-                                Gambar Slider
+                                Gambar Banner Promo
                                 <span
                                     v-if="editingBanner"
                                     class="text-xs font-normal text-muted-foreground"
@@ -543,11 +640,11 @@ function destroyVoucher(voucher: AdminPromoVoucher): void {
                         </div>
                     </div>
 
-                    <!-- Upload Gambar 2: Banner Popup (Portrait) -->
-                    <div class="grid gap-2 rounded-lg border bg-muted/20 p-3">
+                    <!-- Upload Gambar Khusus Popup Banner (Portrait) -->
+                    <div v-else class="grid gap-2 rounded-lg border bg-muted/20 p-3">
                         <div class="flex items-center justify-between gap-2">
                             <Label for="banner_popup_image" class="font-semibold">
-                                Gambar Popup / Featured (opsional)
+                                Gambar Popup Banner
                                 <span
                                     v-if="editingBanner"
                                     class="text-xs font-normal text-muted-foreground"
@@ -556,11 +653,11 @@ function destroyVoucher(voucher: AdminPromoVoucher): void {
                                 </span>
                             </Label>
                             <span class="rounded bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
-                                Diharapkan Portrait (9:16 / 3:4)
+                                Format Portrait (9:16 / 3:4)
                             </span>
                         </div>
                         <p class="text-xs text-muted-foreground">
-                            Ditampilkan saat dialog popup featured muncul di aplikasi mobile. Ukuran rekomendasi: 720 x 1280 px (Portrait).
+                            Ditampilkan saat popup banner muncul ketika pengguna membuka aplikasi. Ukuran rekomendasi: 720 x 1280 px (Portrait).
                         </p>
                         <Input
                             id="banner_popup_image"
@@ -568,14 +665,14 @@ function destroyVoucher(voucher: AdminPromoVoucher): void {
                             accept="image/*"
                             @change="onPopupBannerFile"
                         />
-                        <InputError :message="bannerForm.errors.popup_image" />
+                        <InputError :message="bannerForm.errors.popup_image || bannerForm.errors.image" />
                         <div
-                            v-if="editingBanner?.popup_image_url"
+                            v-if="editingBanner?.popup_image_url || editingBanner?.image_url"
                             class="mt-1 flex items-center gap-2 text-xs text-muted-foreground"
                         >
                             <span>Preview saat ini:</span>
                             <img
-                                :src="editingBanner.popup_image_url"
+                                :src="editingBanner.popup_image_url || editingBanner.image_url"
                                 alt="Popup Preview"
                                 class="h-14 w-9 rounded border object-cover"
                             />
@@ -619,26 +716,6 @@ function destroyVoucher(voucher: AdminPromoVoucher): void {
                                     <SelectItem value="0">Nonaktif</SelectItem>
                                 </SelectContent>
                             </Select>
-                        </div>
-                    </div>
-
-                    <div class="flex items-start gap-3 rounded-lg border bg-muted/40 p-3">
-                        <input
-                            id="banner_featured"
-                            v-model="bannerForm.is_featured"
-                            type="checkbox"
-                            class="text-primary focus:ring-primary mt-1 size-4 cursor-pointer rounded border-gray-300"
-                        />
-                        <div
-                            class="grid cursor-pointer gap-0.5"
-                            @click="bannerForm.is_featured = !bannerForm.is_featured"
-                        >
-                            <Label for="banner_featured" class="cursor-pointer font-medium">
-                                Tampilkan sebagai Popup Utama di Mobile (Featured)
-                            </Label>
-                            <p class="text-xs text-muted-foreground">
-                                Jika diaktifkan, banner ini akan muncul sebagai popup dialog saat pengguna pertama kali membuka aplikasi. Banner featured lainnya otomatis dinonaktifkan.
-                            </p>
                         </div>
                     </div>
                 </div>

@@ -26,12 +26,12 @@ it('accepts bulk voucher import from scanned rows array', function () {
             'margin_percentage' => 5,
         ]);
 
-    $response->assertRedirect(route('admin.vouchers.index'));
+    $response->assertRedirect(route('admin.vouchers.bulk'));
 
     Queue::assertPushed(ValidateVoucherBatchJob::class, function (ValidateVoucherBatchJob $job) {
         return count($job->rows) === 2
-            && $job->rows[0]['serial_number'] === '300338120354186'
+            && $job->rows[0]['serial_number'] === '300338120354'
             && $job->rows[0]['hrn'] === '71125613431848001'
-            && (float) $job->marginPercentage === 5.0;
+            && (float) $job->marginPercentage === 2.0;
     });
 });

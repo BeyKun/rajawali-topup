@@ -158,7 +158,7 @@ create.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
     create.form = createForm
 /**
 * @see \App\Http\Controllers\Admin\VoucherController::check
- * @see app/Http/Controllers/Admin/VoucherController.php:126
+ * @see app/Http/Controllers/Admin/VoucherController.php:127
  * @route '/admin/vouchers/check'
  */
 export const check = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -173,7 +173,7 @@ check.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\VoucherController::check
- * @see app/Http/Controllers/Admin/VoucherController.php:126
+ * @see app/Http/Controllers/Admin/VoucherController.php:127
  * @route '/admin/vouchers/check'
  */
 check.url = (options?: RouteQueryOptions) => {
@@ -182,7 +182,7 @@ check.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\Admin\VoucherController::check
- * @see app/Http/Controllers/Admin/VoucherController.php:126
+ * @see app/Http/Controllers/Admin/VoucherController.php:127
  * @route '/admin/vouchers/check'
  */
 check.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -192,7 +192,7 @@ check.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
 
     /**
 * @see \App\Http\Controllers\Admin\VoucherController::check
- * @see app/Http/Controllers/Admin/VoucherController.php:126
+ * @see app/Http/Controllers/Admin/VoucherController.php:127
  * @route '/admin/vouchers/check'
  */
     const checkForm = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -202,7 +202,7 @@ check.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
 
             /**
 * @see \App\Http\Controllers\Admin\VoucherController::check
- * @see app/Http/Controllers/Admin/VoucherController.php:126
+ * @see app/Http/Controllers/Admin/VoucherController.php:127
  * @route '/admin/vouchers/check'
  */
         checkForm.post = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -213,7 +213,7 @@ check.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
     check.form = checkForm
 /**
 * @see \App\Http\Controllers\Admin\VoucherController::store
- * @see app/Http/Controllers/Admin/VoucherController.php:160
+ * @see app/Http/Controllers/Admin/VoucherController.php:161
  * @route '/admin/vouchers'
  */
 export const store = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -228,7 +228,7 @@ store.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\VoucherController::store
- * @see app/Http/Controllers/Admin/VoucherController.php:160
+ * @see app/Http/Controllers/Admin/VoucherController.php:161
  * @route '/admin/vouchers'
  */
 store.url = (options?: RouteQueryOptions) => {
@@ -237,7 +237,7 @@ store.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\Admin\VoucherController::store
- * @see app/Http/Controllers/Admin/VoucherController.php:160
+ * @see app/Http/Controllers/Admin/VoucherController.php:161
  * @route '/admin/vouchers'
  */
 store.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -247,7 +247,7 @@ store.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
 
     /**
 * @see \App\Http\Controllers\Admin\VoucherController::store
- * @see app/Http/Controllers/Admin/VoucherController.php:160
+ * @see app/Http/Controllers/Admin/VoucherController.php:161
  * @route '/admin/vouchers'
  */
     const storeForm = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -257,7 +257,7 @@ store.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
 
             /**
 * @see \App\Http\Controllers\Admin\VoucherController::store
- * @see app/Http/Controllers/Admin/VoucherController.php:160
+ * @see app/Http/Controllers/Admin/VoucherController.php:161
  * @route '/admin/vouchers'
  */
         storeForm.post = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -268,7 +268,7 @@ store.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
     store.form = storeForm
 /**
 * @see \App\Http\Controllers\Admin\VoucherController::update
- * @see app/Http/Controllers/Admin/VoucherController.php:199
+ * @see app/Http/Controllers/Admin/VoucherController.php:200
  * @route '/admin/vouchers/{voucher}'
  */
 export const update = (args: { voucher: number | { id: number } } | [voucher: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'put'> => ({
@@ -283,7 +283,7 @@ update.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\VoucherController::update
- * @see app/Http/Controllers/Admin/VoucherController.php:199
+ * @see app/Http/Controllers/Admin/VoucherController.php:200
  * @route '/admin/vouchers/{voucher}'
  */
 update.url = (args: { voucher: number | { id: number } } | [voucher: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -316,7 +316,7 @@ update.url = (args: { voucher: number | { id: number } } | [voucher: number | { 
 
 /**
 * @see \App\Http\Controllers\Admin\VoucherController::update
- * @see app/Http/Controllers/Admin/VoucherController.php:199
+ * @see app/Http/Controllers/Admin/VoucherController.php:200
  * @route '/admin/vouchers/{voucher}'
  */
 update.put = (args: { voucher: number | { id: number } } | [voucher: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'put'> => ({
@@ -326,7 +326,7 @@ update.put = (args: { voucher: number | { id: number } } | [voucher: number | { 
 
     /**
 * @see \App\Http\Controllers\Admin\VoucherController::update
- * @see app/Http/Controllers/Admin/VoucherController.php:199
+ * @see app/Http/Controllers/Admin/VoucherController.php:200
  * @route '/admin/vouchers/{voucher}'
  */
     const updateForm = (args: { voucher: number | { id: number } } | [voucher: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -341,7 +341,7 @@ update.put = (args: { voucher: number | { id: number } } | [voucher: number | { 
 
             /**
 * @see \App\Http\Controllers\Admin\VoucherController::update
- * @see app/Http/Controllers/Admin/VoucherController.php:199
+ * @see app/Http/Controllers/Admin/VoucherController.php:200
  * @route '/admin/vouchers/{voucher}'
  */
         updateForm.put = (args: { voucher: number | { id: number } } | [voucher: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -357,7 +357,7 @@ update.put = (args: { voucher: number | { id: number } } | [voucher: number | { 
     update.form = updateForm
 /**
 * @see \App\Http\Controllers\Admin\VoucherController::destroy
- * @see app/Http/Controllers/Admin/VoucherController.php:254
+ * @see app/Http/Controllers/Admin/VoucherController.php:256
  * @route '/admin/vouchers/{voucher}'
  */
 export const destroy = (args: { voucher: number | { id: number } } | [voucher: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'delete'> => ({
@@ -372,7 +372,7 @@ destroy.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\VoucherController::destroy
- * @see app/Http/Controllers/Admin/VoucherController.php:254
+ * @see app/Http/Controllers/Admin/VoucherController.php:256
  * @route '/admin/vouchers/{voucher}'
  */
 destroy.url = (args: { voucher: number | { id: number } } | [voucher: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -405,7 +405,7 @@ destroy.url = (args: { voucher: number | { id: number } } | [voucher: number | {
 
 /**
 * @see \App\Http\Controllers\Admin\VoucherController::destroy
- * @see app/Http/Controllers/Admin/VoucherController.php:254
+ * @see app/Http/Controllers/Admin/VoucherController.php:256
  * @route '/admin/vouchers/{voucher}'
  */
 destroy.delete = (args: { voucher: number | { id: number } } | [voucher: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'delete'> => ({
@@ -415,7 +415,7 @@ destroy.delete = (args: { voucher: number | { id: number } } | [voucher: number 
 
     /**
 * @see \App\Http\Controllers\Admin\VoucherController::destroy
- * @see app/Http/Controllers/Admin/VoucherController.php:254
+ * @see app/Http/Controllers/Admin/VoucherController.php:256
  * @route '/admin/vouchers/{voucher}'
  */
     const destroyForm = (args: { voucher: number | { id: number } } | [voucher: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -430,7 +430,7 @@ destroy.delete = (args: { voucher: number | { id: number } } | [voucher: number 
 
             /**
 * @see \App\Http\Controllers\Admin\VoucherController::destroy
- * @see app/Http/Controllers/Admin/VoucherController.php:254
+ * @see app/Http/Controllers/Admin/VoucherController.php:256
  * @route '/admin/vouchers/{voucher}'
  */
         destroyForm.delete = (args: { voucher: number | { id: number } } | [voucher: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -446,7 +446,7 @@ destroy.delete = (args: { voucher: number | { id: number } } | [voucher: number 
     destroy.form = destroyForm
 /**
 * @see \App\Http\Controllers\Admin\VoucherController::bulk
- * @see app/Http/Controllers/Admin/VoucherController.php:270
+ * @see app/Http/Controllers/Admin/VoucherController.php:272
  * @route '/admin/vouchers/bulk'
  */
 export const bulk = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -461,7 +461,7 @@ bulk.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\VoucherController::bulk
- * @see app/Http/Controllers/Admin/VoucherController.php:270
+ * @see app/Http/Controllers/Admin/VoucherController.php:272
  * @route '/admin/vouchers/bulk'
  */
 bulk.url = (options?: RouteQueryOptions) => {
@@ -470,7 +470,7 @@ bulk.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\Admin\VoucherController::bulk
- * @see app/Http/Controllers/Admin/VoucherController.php:270
+ * @see app/Http/Controllers/Admin/VoucherController.php:272
  * @route '/admin/vouchers/bulk'
  */
 bulk.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -479,7 +479,7 @@ bulk.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
 })
 /**
 * @see \App\Http\Controllers\Admin\VoucherController::bulk
- * @see app/Http/Controllers/Admin/VoucherController.php:270
+ * @see app/Http/Controllers/Admin/VoucherController.php:272
  * @route '/admin/vouchers/bulk'
  */
 bulk.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
@@ -489,7 +489,7 @@ bulk.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
 
     /**
 * @see \App\Http\Controllers\Admin\VoucherController::bulk
- * @see app/Http/Controllers/Admin/VoucherController.php:270
+ * @see app/Http/Controllers/Admin/VoucherController.php:272
  * @route '/admin/vouchers/bulk'
  */
     const bulkForm = (options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -499,7 +499,7 @@ bulk.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
 
             /**
 * @see \App\Http\Controllers\Admin\VoucherController::bulk
- * @see app/Http/Controllers/Admin/VoucherController.php:270
+ * @see app/Http/Controllers/Admin/VoucherController.php:272
  * @route '/admin/vouchers/bulk'
  */
         bulkForm.get = (options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -508,7 +508,7 @@ bulk.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
         })
             /**
 * @see \App\Http\Controllers\Admin\VoucherController::bulk
- * @see app/Http/Controllers/Admin/VoucherController.php:270
+ * @see app/Http/Controllers/Admin/VoucherController.php:272
  * @route '/admin/vouchers/bulk'
  */
         bulkForm.head = (options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -524,7 +524,7 @@ bulk.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
     bulk.form = bulkForm
 /**
 * @see \App\Http\Controllers\Admin\VoucherOcrController::scanPhoto
- * @see app/Http/Controllers/Admin/VoucherOcrController.php:20
+ * @see app/Http/Controllers/Admin/VoucherOcrController.php:21
  * @route '/admin/vouchers/scan-photo'
  */
 export const scanPhoto = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -539,7 +539,7 @@ scanPhoto.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\VoucherOcrController::scanPhoto
- * @see app/Http/Controllers/Admin/VoucherOcrController.php:20
+ * @see app/Http/Controllers/Admin/VoucherOcrController.php:21
  * @route '/admin/vouchers/scan-photo'
  */
 scanPhoto.url = (options?: RouteQueryOptions) => {
@@ -548,7 +548,7 @@ scanPhoto.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\Admin\VoucherOcrController::scanPhoto
- * @see app/Http/Controllers/Admin/VoucherOcrController.php:20
+ * @see app/Http/Controllers/Admin/VoucherOcrController.php:21
  * @route '/admin/vouchers/scan-photo'
  */
 scanPhoto.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -558,7 +558,7 @@ scanPhoto.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
 
     /**
 * @see \App\Http\Controllers\Admin\VoucherOcrController::scanPhoto
- * @see app/Http/Controllers/Admin/VoucherOcrController.php:20
+ * @see app/Http/Controllers/Admin/VoucherOcrController.php:21
  * @route '/admin/vouchers/scan-photo'
  */
     const scanPhotoForm = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -568,7 +568,7 @@ scanPhoto.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
 
             /**
 * @see \App\Http\Controllers\Admin\VoucherOcrController::scanPhoto
- * @see app/Http/Controllers/Admin/VoucherOcrController.php:20
+ * @see app/Http/Controllers/Admin/VoucherOcrController.php:21
  * @route '/admin/vouchers/scan-photo'
  */
         scanPhotoForm.post = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({

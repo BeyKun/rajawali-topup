@@ -1,21 +1,12 @@
 <script setup lang="ts">
-import { router, useForm } from '@inertiajs/vue3';
-import { Boxes, Package, Pencil, Search, X } from '@lucide/vue';
-import { reactive, ref } from 'vue';
+import { router } from '@inertiajs/vue3';
+import { Package, Search, X } from '@lucide/vue';
+import { reactive } from 'vue';
 import Heading from '@/components/Heading.vue';
 import Pagination from '@/components/admin/Pagination.vue';
 import StatusBadge from '@/components/admin/StatusBadge.vue';
 import { Button } from '@/components/ui/button';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
@@ -53,14 +44,6 @@ const filterState = reactive({
     stock: props.filters.stock ?? 'all',
 });
 
-const editing = ref<AdminProductRow | null>(null);
-
-const form = useForm({
-    sell_price: '' as string | number,
-    is_active: true as boolean,
-    sort_order: 0 as number,
-});
-
 function applyFilters(): void {
     router.get(
         '/admin/products',
@@ -78,37 +61,16 @@ function resetFilters(): void {
     applyFilters();
 }
 
-function openEdit(product: AdminProductRow): void {
-    editing.value = product;
-    form.clearErrors();
-    form.sell_price = product.sell_price;
-    form.is_active = product.is_active;
-    form.sort_order = product.sort_order;
-}
-
-function submitEdit(): void {
-    if (editing.value === null) {
-        return;
+function stockClass(stock: number): string {
+    if (stock === 0) {
+        return 'text-destructive';
     }
 
-    form.put(`/admin/products/${editing.value.id}`, {
-        preserveScroll: true,
-        onSuccess: () => {
-            editing.value = null;
-        },
-    });
-}
-
-function stockClass(available: number): string {
-    if (available === 0) {
-        return 'text-red-600';
-    }
-
-    if (available < 5) {
+    if (stock <= 5) {
         return 'text-amber-600';
     }
 
-    return 'text-emerald-600';
+    return 'text-foreground';
 }
 </script>
 
@@ -116,25 +78,25 @@ function stockClass(available: number): string {
     <div class="flex h-full flex-1 flex-col gap-4 p-4">
         <Heading
             title="Katalog Paket"
-            description="Paket dikelompokkan otomatis dari voucher. Atur harga jual dan ketersediaan yang tampil di aplikasi."
+            description="Katalog paket voucher dan ketersediaan stok di sistem."
         />
 
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div class="grid gap-3 sm:grid-cols-3">
             <div class="rounded-xl border p-4">
                 <p class="text-xs text-muted-foreground">Total Paket</p>
-                <p class="text-2xl font-semibold">
+                <p class="mt-1 text-2xl font-bold">
                     {{ props.summary.total_products }}
                 </p>
             </div>
             <div class="rounded-xl border p-4">
                 <p class="text-xs text-muted-foreground">Paket Aktif</p>
-                <p class="text-2xl font-semibold">
+                <p class="mt-1 text-2xl font-bold text-emerald-600">
                     {{ props.summary.active_products }}
                 </p>
             </div>
             <div class="rounded-xl border p-4">
-                <p class="text-xs text-muted-foreground">Stok Tersedia</p>
-                <p class="text-2xl font-semibold">
+                <p class="text-xs text-muted-foreground">Total Stok Siap Jual</p>
+                <p class="mt-1 text-2xl font-bold">
                     {{ props.summary.available_stock }}
                 </p>
             </div>
@@ -156,21 +118,21 @@ function stockClass(available: number): string {
                         id="search"
                         v-model="filterState.search"
                         class="pl-8"
-                        placeholder="Nama paket, kuota, atau region"
+                        placeholder="Nama paket, kuota, atau wilayah"
                     />
                 </div>
             </div>
 
-            <div class="grid gap-1">
-                <label class="text-xs text-muted-foreground">Stok</label>
+            <div class="grid min-w-36 gap-1">
+                <label class="text-xs text-muted-foreground">Filter Stok</label>
                 <Select v-model="filterState.stock">
-                    <SelectTrigger class="w-40">
-                        <SelectValue placeholder="Semua stok" />
+                    <SelectTrigger>
+                        <SelectValue placeholder="Semua Stok" />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="all">Semua stok</SelectItem>
-                        <SelectItem value="low">Stok menipis</SelectItem>
-                        <SelectItem value="empty">Stok kosong</SelectItem>
+                        <SelectItem value="all">Semua Stok</SelectItem>
+                        <SelectItem value="low">Menipis (&le; 5)</SelectItem>
+                        <SelectItem value="empty">Habis (0)</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
@@ -189,14 +151,13 @@ function stockClass(available: number): string {
             <table class="w-full text-sm">
                 <thead class="bg-muted/50 text-left">
                     <tr>
-                        <th class="px-4 py-3 font-medium">Paket</th>
-                        <th class="px-4 py-3 font-medium">Kuota</th>
+                        <th class="px-4 py-3 font-medium">Nama Paket</th>
+                        <th class="px-4 py-3 font-medium">Deskripsi Kuota</th>
                         <th class="px-4 py-3 font-medium">Masa Aktif</th>
-                        <th class="px-4 py-3 font-medium">Region</th>
+                        <th class="px-4 py-3 font-medium">Wilayah</th>
                         <th class="px-4 py-3 font-medium">Harga Jual</th>
-                        <th class="px-4 py-3 font-medium">Stok</th>
+                        <th class="px-4 py-3 font-medium">Stok Tersedia</th>
                         <th class="px-4 py-3 font-medium">Status</th>
-                        <th class="px-4 py-3 text-right font-medium">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -237,20 +198,10 @@ function stockClass(available: number): string {
                                 :status="product.is_active ? 'ACTIVE' : 'INACTIVE'"
                             />
                         </td>
-                        <td class="px-4 py-3 text-right">
-                            <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                aria-label="Edit"
-                                @click="openEdit(product)"
-                            >
-                                <Pencil class="size-4" />
-                            </Button>
-                        </td>
                     </tr>
                     <tr v-if="props.products.data.length === 0">
                         <td
-                            colspan="8"
+                            colspan="7"
                             class="px-4 py-12 text-center text-muted-foreground"
                         >
                             <Package class="mx-auto mb-2 size-8 opacity-40" />
@@ -264,98 +215,4 @@ function stockClass(available: number): string {
 
         <Pagination :paginator="props.products" />
     </div>
-
-    <Dialog
-        :open="editing !== null"
-        @update:open="(value: boolean) => !value && (editing = null)"
-    >
-        <DialogContent v-if="editing">
-            <DialogHeader>
-                <DialogTitle>Edit Paket</DialogTitle>
-                <DialogDescription>
-                    {{ editing.name }} &middot;
-                    {{ editing.quota_description }}
-                </DialogDescription>
-            </DialogHeader>
-
-            <div class="grid gap-4">
-                <div class="grid gap-2">
-                    <Label for="sell_price">Harga Jual (Rp)</Label>
-                    <Input
-                        id="sell_price"
-                        v-model="form.sell_price"
-                        inputmode="numeric"
-                    />
-                    <p
-                        v-if="form.errors.sell_price"
-                        class="text-xs text-destructive"
-                    >
-                        {{ form.errors.sell_price }}
-                    </p>
-                </div>
-
-                <div class="grid gap-2">
-                    <Label for="sort_order">Urutan Tampil</Label>
-                    <Input
-                        id="sort_order"
-                        v-model="form.sort_order"
-                        inputmode="numeric"
-                    />
-                    <p
-                        v-if="form.errors.sort_order"
-                        class="text-xs text-destructive"
-                    >
-                        {{ form.errors.sort_order }}
-                    </p>
-                    <p class="text-xs text-muted-foreground">
-                        Angka lebih kecil tampil lebih dulu di aplikasi.
-                    </p>
-                </div>
-
-                <div class="grid gap-2">
-                    <Label>Status</Label>
-                    <div class="flex items-center gap-2">
-                        <Button
-                            type="button"
-                            :variant="form.is_active ? 'default' : 'outline'"
-                            size="sm"
-                            @click="form.is_active = true"
-                        >
-                            <Boxes class="size-4" />
-                            Aktif
-                        </Button>
-                        <Button
-                            type="button"
-                            :variant="!form.is_active ? 'default' : 'outline'"
-                            size="sm"
-                            @click="form.is_active = false"
-                        >
-                            Nonaktif
-                        </Button>
-                    </div>
-                    <p class="text-xs text-muted-foreground">
-                        Paket nonaktif tidak muncul di katalog aplikasi.
-                    </p>
-                </div>
-
-                <div
-                    class="rounded-lg border bg-muted/40 p-3 text-xs text-muted-foreground"
-                >
-                    Stok tersedia saat ini:
-                    <span class="font-semibold text-foreground">
-                        {{ editing.available_stock }}
-                    </span>
-                </div>
-            </div>
-
-            <DialogFooter>
-                <Button variant="outline" @click="editing = null">
-                    Batal
-                </Button>
-                <Button :disabled="form.processing" @click="submitEdit">
-                    Simpan
-                </Button>
-            </DialogFooter>
-        </DialogContent>
-    </Dialog>
 </template>

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -78,6 +79,27 @@ class User extends Authenticatable
     public function city(): BelongsTo
     {
         return $this->belongsTo(City::class);
+    }
+
+    public function cities(): BelongsToMany
+    {
+        return $this->belongsToMany(City::class, 'admin_cities', 'user_id', 'city_id');
+    }
+
+    /**
+     * Get all city IDs managed by this admin user.
+     * Combines pivot table cities and fallback single city_id.
+     *
+     * @return array<int, int>
+     */
+    public function managedCityIds(): array
+    {
+        $ids = $this->cities()->pluck('cities.id')->map(fn ($id) => (int) $id)->all();
+        if (empty($ids) && $this->city_id !== null) {
+            $ids = [(int) $this->city_id];
+        }
+
+        return array_values(array_unique($ids));
     }
 
     /**

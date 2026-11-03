@@ -72,3 +72,23 @@ export function formatShortDay(value: string): string {
         month: 'short',
     }).format(date);
 }
+
+/**
+ * Format a number with Indonesian thousands separator (e.g. 15000 -> "15.000").
+ */
+export function formatThousands(value: number | string | null | undefined): string {
+    if (value === null || value === undefined || value === '') return '';
+    const num = typeof value === 'string' ? Number(value.replace(/\D/g, '')) : value;
+    if (Number.isNaN(num)) return '';
+    return new Intl.NumberFormat('id-ID').format(num);
+}
+
+/**
+ * Parse an Indonesian formatted number string into a clean number.
+ */
+export function parseThousands(value: string | number | null | undefined): number {
+    if (typeof value === 'number') return value;
+    if (!value) return 0;
+    const clean = String(value).replace(/\D/g, '');
+    return clean ? Number(clean) : 0;
+}

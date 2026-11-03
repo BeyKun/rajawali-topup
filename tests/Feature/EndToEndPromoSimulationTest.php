@@ -88,7 +88,7 @@ test('an admin-provisioned outlet checks out with a promo voucher end to end', f
 
     $product = Product::query()->sole();
 
-    expect((float) $product->sell_price)->toBe(25000.0)
+    expect((float) $product->sell_price)->toBe(25500.0)
         ->and(Voucher::query()->where('product_id', $product->id)->where('status', VoucherStatus::Available)->count())->toBe(1);
 
     // 3. Admin uploads a promo banner for the mobile home carousel.
@@ -171,7 +171,7 @@ test('an admin-provisioned outlet checks out with a promo voucher end to end', f
         ->assertJsonPath('valid', true)
         ->assertJsonPath('code', 'HEMAT10')
         ->assertJsonPath('discount_amount', 10000)
-        ->assertJsonPath('final_amount', 15000)
+        ->assertJsonPath('final_amount', 15500)
         ->assertJsonPath('message', 'Diskon Rp 10.000 diterapkan');
 
     // 8. The outlet confirms the purchase with the promo code applied.
@@ -183,22 +183,22 @@ test('an admin-provisioned outlet checks out with a promo voucher end to end', f
         ])
         ->assertCreated()
         ->assertJsonPath('success', true)
-        ->assertJsonPath('data.amount', 25000)
+        ->assertJsonPath('data.amount', 25500)
         ->assertJsonPath('data.discount_amount', 10000)
         ->assertJsonPath('data.promo_code', 'HEMAT10')
-        ->assertJsonPath('data.total_amount', 15000);
+        ->assertJsonPath('data.total_amount', 15500);
 
     $order = Order::query()->where('order_no', $created->json('data.order_no'))->sole();
 
     expect($order->user_id)->toBe($outlet->id)
-        ->and((float) $order->total_amount)->toBe(15000.0)
+        ->and((float) $order->total_amount)->toBe(15500.0)
         ->and($order->promo_voucher_id)->toBe($promo->id);
 
     // The QRIS invoice is built for the discounted amount, not the list price.
     $qris = (string) $created->json('data.qris_string');
 
-    expect($qris)->toContain('540815000.00')
-        ->and($qris)->not->toContain('540825000.00');
+    expect($qris)->toContain('540815500.00')
+        ->and($qris)->not->toContain('540825500.00');
 
     // 9. The promo quota is consumed and the physical stock is reserved.
     expect($promo->fresh()->used_count)->toBe(1)

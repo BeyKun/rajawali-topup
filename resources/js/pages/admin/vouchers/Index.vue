@@ -208,6 +208,12 @@ async function checkSerial(): Promise<void> {
 function submitEdit(): void {
     if (!editingVoucher.value) return;
 
+    const price = Number(editForm.sell_price);
+    if (isNaN(price) || price <= 0) {
+        editForm.setError('sell_price', 'Harga voucher tidak boleh 0 atau kurang.');
+        return;
+    }
+
     editForm.transform((data) => ({
         ...data,
         serial_number: cleanDigits(data.serial_number),

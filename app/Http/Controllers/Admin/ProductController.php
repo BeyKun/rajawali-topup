@@ -33,25 +33,25 @@ class ProductController extends Controller
         $search = $request->string('search')->toString() ?: null;
         $stock = $request->string('stock')->toString() ?: null;
 
-        $cityId = $request->user()?->isKabupatenAdmin() ? $request->user()->city_id : null;
+        $cityIds = $request->user()?->isKabupatenAdmin() ? $request->user()->managedCityIds() : null;
 
         $products = Product::query()
-            ->when($cityId, fn (Builder $q) => $q->where(fn (Builder $inner) => $inner
-                ->where('city_id', $cityId)
+            ->when(! empty($cityIds), fn (Builder $q) => $q->where(fn (Builder $inner) => $inner
+                ->whereIn('city_id', $cityIds)
                 ->orWhere(fn (Builder $shared) => $shared
                     ->whereNull('city_id')
-                    ->whereHas('vouchers', fn (Builder $vq) => $vq->forCity($cityId))
+                    ->whereHas('vouchers', fn (Builder $vq) => $vq->forCity($cityIds))
                 )
             ))
             ->withCount([
                 'vouchers as available_stock' => fn (Builder $query) => $query
                     ->where('status', VoucherStatus::Available)
-                    ->when($cityId, fn (Builder $q) => $q->forCity($cityId)),
+                    ->when(! empty($cityIds), fn (Builder $q) => $q->forCity($cityIds)),
                 'vouchers as reserved_stock' => fn (Builder $query) => $query
                     ->where('status', VoucherStatus::Reserved)
-                    ->when($cityId, fn (Builder $q) => $q->forCity($cityId)),
+                    ->when(! empty($cityIds), fn (Builder $q) => $q->forCity($cityIds)),
                 'vouchers as total_stock' => fn (Builder $query) => $query
-                    ->when($cityId, fn (Builder $q) => $q->forCity($cityId)),
+                    ->when(! empty($cityIds), fn (Builder $q) => $q->forCity($cityIds)),
             ])
             ->when($search, fn (Builder $query, string $term) => $query
                 ->where(fn (Builder $inner) => $inner
@@ -59,22 +59,16 @@ class ProductController extends Controller
                     ->orWhere('quota_description', 'like', "%{$term}%")
                     ->orWhere('region', 'like', "%{$term}%")))
             ->when($stock === 'low', fn (Builder $query) => $query
-                ->whereRaw(
-                    '(select count(*) from vouchers where vouchers.product_id = products.id and vouchers.status = ?'
-                    .($cityId ? ' and (vouchers.city_id = ? or exists (select 1 from voucher_cities where voucher_cities.voucher_id = vouchers.id and voucher_cities.city_id = ?))' : '')
-                    .') < ?',
-                    $cityId
-                        ? [VoucherStatus::Available->value, $cityId, $cityId, self::LOW_STOCK_THRESHOLD]
-                        : [VoucherStatus::Available->value, self::LOW_STOCK_THRESHOLD],
-                ))
+                ->where(function (Builder $q) use ($cityIds): void {
+                    $q->has('vouchers', '<', self::LOW_STOCK_THRESHOLD, 'and', fn (Builder $vq) => $vq
+                        ->where('status', VoucherStatus::Available)
+                        ->when(! empty($cityIds), fn (Builder $sub) => $sub->forCity($cityIds))
+                    );
+                }))
             ->when($stock === 'empty', fn (Builder $query) => $query
-                ->whereRaw(
-                    '(select count(*) from vouchers where vouchers.product_id = products.id and vouchers.status = ?'
-                    .($cityId ? ' and (vouchers.city_id = ? or exists (select 1 from voucher_cities where voucher_cities.voucher_id = vouchers.id and voucher_cities.city_id = ?))' : '')
-                    .') = 0',
-                    $cityId
-                        ? [VoucherStatus::Available->value, $cityId, $cityId]
-                        : [VoucherStatus::Available->value],
+                ->whereDoesntHave('vouchers', fn (Builder $vq) => $vq
+                    ->where('status', VoucherStatus::Available)
+                    ->when(! empty($cityIds), fn (Builder $sub) => $sub->forCity($cityIds))
                 ))
             ->orderBy('sort_order')
             ->orderBy('id')
@@ -95,11 +89,11 @@ class ProductController extends Controller
                 'total_stock' => (int) $product->total_stock,
             ]);
 
-        $summaryQuery = Product::query()->when($cityId, fn (Builder $q) => $q->where(fn (Builder $inner) => $inner
-            ->where('city_id', $cityId)
+        $summaryQuery = Product::query()->when(! empty($cityIds), fn (Builder $q) => $q->where(fn (Builder $inner) => $inner
+            ->whereIn('city_id', $cityIds)
             ->orWhere(fn (Builder $shared) => $shared
                 ->whereNull('city_id')
-                ->whereHas('vouchers', fn (Builder $vq) => $vq->forCity($cityId))
+                ->whereHas('vouchers', fn (Builder $vq) => $vq->forCity($cityIds))
             )
         ));
 
@@ -113,7 +107,7 @@ class ProductController extends Controller
                 'total_products' => (clone $summaryQuery)->count(),
                 'active_products' => (clone $summaryQuery)->where('is_active', true)->count(),
                 'available_stock' => Voucher::query()
-                    ->forCity($cityId)
+                    ->forCity($cityIds)
                     ->where('status', VoucherStatus::Available)
                     ->count(),
             ],

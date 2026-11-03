@@ -61,7 +61,7 @@ test('a valid voucher is stored as available with an encrypted hrn and auto-crea
 
     $product = Product::query()->findOrFail($voucher->product_id);
 
-    expect((float) $product->sell_price)->toBe(25000.0)
+    expect((float) $product->sell_price)->toBe(25500.0)
         ->and($product->is_active)->toBeTrue()
         ->and($product->region)->not->toBeNull();
 

@@ -31,7 +31,7 @@ class DashboardController extends Controller
      */
     public function index(Request $request): Response
     {
-        $cityId = $request->user()?->isKabupatenAdmin() ? $request->user()->city_id : null;
+        $cityId = $request->user()?->isKabupatenAdmin() ? $request->user()->managedCityIds() : null;
         $today = Carbon::today();
         $startOfMonth = Carbon::now()->startOfMonth();
 
@@ -67,7 +67,7 @@ class DashboardController extends Controller
      *
      * @return Builder<Order>
      */
-    private function paidOrders(?int $cityId = null): Builder
+    private function paidOrders(int|array|null $cityId = null): Builder
     {
         return Order::query()
             ->forCity($cityId)
@@ -82,7 +82,7 @@ class DashboardController extends Controller
      *
      * @return array<int, array{date: string, revenue: float, orders: int}>
      */
-    private function salesChart(?int $cityId = null): array
+    private function salesChart(int|array|null $cityId = null): array
     {
         $start = Carbon::today()->subDays(self::SALES_CHART_DAYS - 1);
 
@@ -119,7 +119,7 @@ class DashboardController extends Controller
      *
      * @return array<int, array{id: int, name: string, available_stock: int}>
      */
-    private function lowStock(?int $cityId = null): array
+    private function lowStock(int|array|null $cityId = null): array
     {
         return Product::query()
             ->forCity($cityId)
@@ -127,7 +127,7 @@ class DashboardController extends Controller
             ->withCount([
                 'vouchers as available_stock' => fn (Builder $query) => $query
                     ->where('status', VoucherStatus::Available)
-                    ->when($cityId, fn (Builder $q) => $q->where('city_id', $cityId)),
+                    ->when($cityId, fn (Builder $q) => $q->forCity($cityId)),
             ])
             ->orderBy('available_stock')
             ->get()
@@ -146,7 +146,7 @@ class DashboardController extends Controller
      *
      * @return array<int, array<string, mixed>>
      */
-    private function recentOrders(?int $cityId = null): array
+    private function recentOrders(int|array|null $cityId = null): array
     {
         return Order::query()
             ->forCity($cityId)

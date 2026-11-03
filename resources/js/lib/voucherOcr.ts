@@ -163,8 +163,8 @@ export function extractSerialCandidate(rawText: string): { digits: string; isExp
     // Normalize OCR confusion for serial lines as well
     const normalized = sanitizeOcrConfusion(trimmed);
 
-    // 1. Telkomsel pattern: starts with 3003 followed by digits
-    const tselMatch = normalized.match(/\b(3003[\s\-]?[0-9\s\-]{8,15})\b/i);
+    // 1. Telkomsel pattern: starts with 3003 or 5007 followed by digits
+    const tselMatch = normalized.match(/\b((?:3003|5007)[\s\-]?[0-9\s\-]{8,15})\b/i);
 
     // 2. Explicit label match
     const labelMatch = normalized.match(/(?:no\.?\s*seri|nomor\s*seri|seri\b|s\/n\b|s\.n\b|sn\b|serial|barcode)\s*[:\.\-]?\s*([0-9\s\-]{10,18})/i);
@@ -173,14 +173,12 @@ export function extractSerialCandidate(rawText: string): { digits: string; isExp
         const matchStr = tselMatch ? tselMatch[1] : labelMatch![1];
         let sDigits = matchStr.replace(/\D/g, '');
 
-        // Rule: For 15-digit serial numbers, discard the last 3 digits (store 12 digits)
-        if (sDigits.length >= 15) {
-            sDigits = sDigits.slice(0, 12);
-        } else if (sDigits.startsWith('3003') && sDigits.length > 12) {
+        // Rule 12: For serial numbers longer than 12 digits, discard the trailing digits (store first 12 digits)
+        if (sDigits.length > 12) {
             sDigits = sDigits.slice(0, 12);
         }
 
-        if (sDigits.length >= 12) {
+        if (sDigits.length === 12) {
             return {
                 digits: sDigits,
                 isExplicitSerial: true,

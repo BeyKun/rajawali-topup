@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import { formatRupiah, formatThousands, parseThousands } from '@/lib/format';
 import {
     cleanDigits,
     formatHrn,
@@ -37,41 +38,34 @@ defineOptions({
 const props = defineProps<{
     is_super_admin?: boolean;
     cities?: CityOption[];
+    default_margin?: number;
 }>();
+
+const fixedMargin = computed(() => props.default_margin ?? 2);
 
 const form = useForm({
     serial_number: '',
     hrn: '',
     sell_price: '',
-    margin_percentage: '2',
     city_ids: [] as number[],
 });
 
-const calculatedFinalPrice = computed(() => {
-    const base = Math.max(0, parseFloat(String(form.sell_price)) || 0);
-    const margin = Math.max(0, parseFloat(String(form.margin_percentage)) || 0);
-    return Math.round(base * (1 + margin / 100));
-});
+const formattedPriceInput = ref('');
 
-function onMarginInput(event: Event): void {
+function onPriceInput(event: Event): void {
     const target = event.target as HTMLInputElement;
-    let val = target.value;
-    if (val.includes('-')) {
-        val = val.replace(/-/g, '');
-        form.margin_percentage = val;
-    }
-    if (parseFloat(val) < 0) {
-        form.margin_percentage = '0';
-    }
+    const rawNum = parseThousands(target.value);
+    form.sell_price = rawNum > 0 ? String(rawNum) : '';
+    formattedPriceInput.value = formatThousands(rawNum);
 }
 
+const calculatedFinalPrice = computed(() => {
+    const base = Math.max(0, parseFloat(String(form.sell_price)) || 0);
+    return Math.round(base * (1 + fixedMargin.value / 100));
+});
+
 const formattedFinalPrice = computed(() => {
-    return new Intl.NumberFormat('id-ID', {
-        style: 'currency',
-        currency: 'IDR',
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-    }).format(calculatedFinalPrice.value);
+    return formatRupiah(calculatedFinalPrice.value);
 });
 
 const checkRequest = useHttp<{ serial_number: string }, VoucherCheckResult>({
@@ -117,10 +111,17 @@ async function checkSerial(): Promise<void> {
 }
 
 function submit(): void {
+    const rawPrice = parseThousands(form.sell_price);
+    if (rawPrice <= 0) {
+        form.setError('sell_price', 'Harga voucher tidak boleh 0 atau kurang.');
+        return;
+    }
+
     form.transform((data) => ({
         ...data,
         serial_number: cleanDigits(data.serial_number),
         hrn: cleanDigits(data.hrn),
+        sell_price: rawPrice,
     })).post('/admin/vouchers');
 }
 </script>
@@ -186,47 +187,31 @@ function submit(): void {
                     </p>
                 </div>
 
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div class="grid gap-2">
-                        <Label for="sell_price">Harga (Rp)</Label>
+                <div class="grid gap-2">
+                    <Label for="sell_price">Harga Jual Dasar (Rp)</Label>
+                    <div class="relative">
+                        <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">Rp</span>
                         <Input
                             id="sell_price"
-                            v-model="form.sell_price"
+                            :model-value="formattedPriceInput"
                             inputmode="numeric"
-                            placeholder="10000"
+                            placeholder="0"
+                            class="pl-9"
+                            @input="onPriceInput"
                         />
-                        <InputError :message="form.errors.sell_price" />
                     </div>
-
-                    <div class="grid gap-2">
-                        <Label for="margin_percentage">Persentase Harga Jual (%)</Label>
-                        <div class="relative">
-                            <Input
-                                id="margin_percentage"
-                                v-model="form.margin_percentage"
-                                type="number"
-                                min="0"
-                                step="any"
-                                placeholder="2"
-                                class="pr-8"
-                                @keydown="(e: KeyboardEvent) => { if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault(); }"
-                                @input="onMarginInput"
-                            />
-                            <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
-                        </div>
-                        <InputError :message="form.errors.margin_percentage" />
-                    </div>
+                    <InputError :message="form.errors.sell_price" />
                 </div>
 
                 <div v-if="Number(form.sell_price) > 0" class="rounded-lg border bg-muted/40 p-3 text-sm">
                     <div class="flex items-center justify-between">
-                        <span class="text-muted-foreground">Harga Jual di Aplikasi Mobile:</span>
+                        <span class="text-muted-foreground">Total Harga Jual di Aplikasi Mobile:</span>
                         <span class="text-base font-semibold text-emerald-600">
                             {{ formattedFinalPrice }}
                         </span>
                     </div>
                     <p class="mt-0.5 text-xs text-muted-foreground">
-                        Kalkulasi: Rp {{ Number(form.sell_price).toLocaleString('id-ID') }} + {{ form.margin_percentage || 0 }}% margin
+                        Kalkulasi: Rp {{ formatThousands(form.sell_price) }} + {{ fixedMargin }}% margin
                     </p>
                 </div>
 

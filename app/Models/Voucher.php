@@ -76,19 +76,21 @@ class Voucher extends Model
     }
 
     /**
-     * Limit the query to a single city, used to scope kabupaten admins.
+     * Limit the query to a city or list of cities, used to scope kabupaten admins.
      *
      * @param  Builder<Voucher>  $query
      */
-    public function scopeForCity(Builder $query, ?int $cityId): Builder
+    public function scopeForCity(Builder $query, int|array|null $cityId): Builder
     {
-        if ($cityId === null) {
+        if ($cityId === null || (is_array($cityId) && empty($cityId))) {
             return $query;
         }
 
-        return $query->where(function (Builder $q) use ($cityId): void {
-            $q->where('vouchers.city_id', $cityId)
-                ->orWhereHas('cities', fn (Builder $cityQuery) => $cityQuery->where('cities.id', $cityId));
+        $cityIds = is_array($cityId) ? $cityId : [$cityId];
+
+        return $query->where(function (Builder $q) use ($cityIds): void {
+            $q->whereIn('vouchers.city_id', $cityIds)
+                ->orWhereHas('cities', fn (Builder $cityQuery) => $cityQuery->whereIn('cities.id', $cityIds));
         });
     }
 }

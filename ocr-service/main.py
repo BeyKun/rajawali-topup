@@ -56,25 +56,30 @@ def strip_labels(s: str) -> str:
 def extract_serial_from_text(text: str) -> Optional[str]:
     """
     Extract serial number (typically 12 to 16 digits) from candidate line.
-    Preserves all 15 digits (e.g. 5007 3033 2927 269 or 3003 3812 0354 186).
+    Rule: if serial number is longer than 12 digits, truncate to first 12 digits.
     """
     cleaned = strip_labels(text)
     norm = sanitize_ocr_confusion(cleaned)
     digits = re.sub(r'\D', '', norm)
 
+    result = None
     # 1. Telkomsel pattern: starts with 3003 or 5007 (commonly 12 to 16 digits)
     m_tsel = re.search(r'\b((?:3003|5007)\d{8,12})\b', digits)
     if m_tsel:
-        return m_tsel.group(1)
-
+        result = m_tsel.group(1)
     # 2. Labeled or explicit serial line: "No Seri : ..."
-    if re.search(r'(?i)(?:seri|sn|s/n|serial|barcode)', text):
+    elif re.search(r'(?i)(?:seri|sn|s/n|serial|barcode)', text):
         if 12 <= len(digits) <= 18:
-            return digits
-
+            result = digits
     # 3. Direct 12 or 15 or 16 digit number (common serial lengths)
-    if len(digits) in (12, 15, 16):
-        return digits
+    elif len(digits) in (12, 15, 16):
+        result = digits
+
+    if result:
+        # Poin 12: Potong jika > 12 digit
+        if len(result) > 12:
+            result = result[:12]
+        return result
 
     return None
 

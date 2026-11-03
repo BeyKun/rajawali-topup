@@ -76,13 +76,19 @@ class Product extends Model
     }
 
     /**
-     * Limit the query to products owned by a city, used to scope kabupaten admins.
+     * Limit the query to products owned by a city or list of cities, used to scope kabupaten admins.
      *
      * @param  Builder<Product>  $query
      */
-    public function scopeForCity(Builder $query, ?int $cityId): Builder
+    public function scopeForCity(Builder $query, int|array|null $cityId): Builder
     {
-        return $cityId === null ? $query : $query->where('city_id', $cityId);
+        if ($cityId === null || (is_array($cityId) && empty($cityId))) {
+            return $query;
+        }
+
+        $cityIds = is_array($cityId) ? $cityId : [$cityId];
+
+        return $query->whereIn('city_id', $cityIds);
     }
 
     /**

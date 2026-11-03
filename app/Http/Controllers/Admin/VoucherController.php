@@ -55,7 +55,7 @@ class VoucherController extends Controller
 
         $vouchers = Voucher::query()
             ->with(['product:id,name,sell_price,hpp_price', 'cities:id'])
-            ->forCity($request->user()?->isKabupatenAdmin() ? $request->user()->city_id : null)
+            ->forCity($request->user()?->isKabupatenAdmin() ? $request->user()->managedCityIds() : null)
             ->when($filters['status'], fn (Builder $query, string $status) => $query->where('status', $status))
             ->when($filters['search'], function (Builder $query, string $search): void {
                 $query->where(function (Builder $inner) use ($search): void {
@@ -86,7 +86,7 @@ class VoucherController extends Controller
         return Inertia::render('admin/vouchers/Index', [
             'vouchers' => $vouchers,
             'filters' => $filters,
-            'statusCounts' => $this->statusCounts($request->user()?->isKabupatenAdmin() ? $request->user()->city_id : null),
+            'statusCounts' => $this->statusCounts($request->user()?->isKabupatenAdmin() ? $request->user()->managedCityIds() : null),
             'is_super_admin' => $isSuperAdmin,
             'cities' => $cities,
         ]);
@@ -114,6 +114,7 @@ class VoucherController extends Controller
         return Inertia::render('admin/vouchers/Create', [
             'is_super_admin' => $isSuperAdmin,
             'cities' => $cities,
+            'default_margin' => (float) config('voucher.default_margin', 2.0),
         ]);
     }
 
@@ -161,12 +162,12 @@ class VoucherController extends Controller
     {
         $cityIds = $request->user()?->isSuperAdmin()
             ? (array) $request->input('city_ids', [])
-            : ($request->user()?->city_id ? [$request->user()->city_id] : []);
+            : ($request->user() ? $request->user()->managedCityIds() : []);
 
         $basePrice = (float) $request->float('sell_price');
         $marginPercentage = $request->filled('margin_percentage')
             ? (float) $request->float('margin_percentage')
-            : 0.0;
+            : (float) config('voucher.default_margin', 2.0);
 
         $finalSellPrice = $marginPercentage > 0
             ? (float) round($basePrice * (1 + ($marginPercentage / 100)))
@@ -205,15 +206,16 @@ class VoucherController extends Controller
         }
 
         if ($request->user()?->isKabupatenAdmin()) {
-            $userCityId = $request->user()->city_id;
-            $hasAccess = $voucher->city_id === $userCityId || $voucher->cities()->where('cities.id', $userCityId)->exists();
+            $userCityIds = $request->user()->managedCityIds();
+            $hasAccess = in_array($voucher->city_id, $userCityIds, true)
+                || $voucher->cities()->whereIn('cities.id', $userCityIds)->exists();
             abort_unless($hasAccess, 403, 'Anda tidak berhak mengubah voucher di luar wilayah Anda.');
         }
 
         $basePrice = (float) $request->float('sell_price');
         $marginPercentage = $request->filled('margin_percentage')
             ? (float) $request->float('margin_percentage')
-            : 0.0;
+            : (float) config('voucher.default_margin', 2.0);
 
         $finalSellPrice = $marginPercentage > 0
             ? (float) round($basePrice * (1 + ($marginPercentage / 100)))
@@ -286,6 +288,7 @@ class VoucherController extends Controller
         return Inertia::render('admin/vouchers/Bulk', [
             'is_super_admin' => $isSuperAdmin,
             'cities' => $cities,
+            'default_margin' => (float) config('voucher.default_margin', 2.0),
         ]);
     }
 
@@ -299,7 +302,7 @@ class VoucherController extends Controller
             'rows' => ['nullable', 'required_without:file', 'array', 'min:1'],
             'rows.*.serial_number' => ['required_with:rows', 'string'],
             'rows.*.hrn' => ['required_with:rows', 'string'],
-            'rows.*.sell_price' => ['required_with:rows', 'numeric', 'min:0'],
+            'rows.*.sell_price' => ['required_with:rows', 'numeric', 'gt:0'],
             'margin_percentage' => ['nullable', 'numeric', 'min:0'],
         ];
 
@@ -308,15 +311,19 @@ class VoucherController extends Controller
             $rules['city_ids.*'] = ['integer', 'exists:cities,id'];
         }
 
-        $validated = $request->validate($rules);
+        $messages = [
+            'rows.*.sell_price.gt' => 'Harga jual voucher tidak boleh 0 atau kurang. Silakan atur harga untuk setiap baris voucher.',
+            'rows.*.sell_price.required_with' => 'Harga jual voucher wajib diisi.',
+            'rows.*.sell_price.numeric' => 'Harga jual voucher harus berupa angka.',
+        ];
+
+        $validated = $request->validate($rules, $messages);
 
         $cityIds = $request->user()?->isSuperAdmin()
             ? (array) ($validated['city_ids'] ?? [])
-            : ($request->user()?->city_id ? [$request->user()->city_id] : []);
+            : ($request->user() ? $request->user()->managedCityIds() : []);
 
-        $marginPercentage = $request->filled('margin_percentage')
-            ? (float) $request->float('margin_percentage')
-            : null;
+        $marginPercentage = (float) config('voucher.default_margin', 2.0);
 
         if ($request->hasFile('file')) {
             try {
@@ -343,11 +350,20 @@ class VoucherController extends Controller
             $rows = [];
 
             foreach ($rawRows as $row) {
-                $serial = (string) preg_replace('/\s+/', '', trim((string) $row['serial_number']));
+                $serial = (string) preg_replace('/\D/', '', trim((string) $row['serial_number']));
+                if (strlen($serial) > 12) {
+                    $serial = substr($serial, 0, 12);
+                }
                 $hrn = (string) preg_replace('/\s+/', '', trim((string) $row['hrn']));
                 $sellPrice = (float) $row['sell_price'];
 
                 if ($serial !== '' && $hrn !== '') {
+                    if ($sellPrice <= 0) {
+                        throw ValidationException::withMessages([
+                            'rows' => "Voucher nomor seri {$serial} memiliki harga Rp 0. Harga voucher tidak boleh 0 atau kurang.",
+                        ]);
+                    }
+
                     $rows[] = [
                         'serial_number' => $serial,
                         'hrn' => $hrn,
@@ -373,7 +389,7 @@ class VoucherController extends Controller
         if (! empty($duplicatesInInput)) {
             $formattedDuplicates = implode(', ', array_slice($duplicatesInInput, 0, 5));
             if (count($duplicatesInInput) > 5) {
-                $formattedDuplicates .= ' (+ ' . (count($duplicatesInInput) - 5) . ' lainnya)';
+                $formattedDuplicates .= ' (+ '.(count($duplicatesInInput) - 5).' lainnya)';
             }
 
             throw ValidationException::withMessages([
@@ -390,7 +406,7 @@ class VoucherController extends Controller
         if (! empty($existingSerials)) {
             $formattedExisting = implode(', ', array_slice($existingSerials, 0, 5));
             if (count($existingSerials) > 5) {
-                $formattedExisting .= ' (+ ' . (count($existingSerials) - 5) . ' lainnya)';
+                $formattedExisting .= ' (+ '.(count($existingSerials) - 5).' lainnya)';
             }
 
             throw ValidationException::withMessages([
@@ -405,7 +421,11 @@ class VoucherController extends Controller
             'message' => sprintf('Import %d baris diproses di background. Cek daftar voucher untuk hasilnya.', count($rows)),
         ]);
 
-        return to_route('admin.vouchers.index');
+        return to_route('admin.vouchers.bulk')->with('bulk_result', [
+            'success' => true,
+            'count' => count($rows),
+            'message' => sprintf('Berhasil menambahkan %d voucher ke antrean inventori.', count($rows)),
+        ]);
     }
 
     /**
@@ -413,7 +433,7 @@ class VoucherController extends Controller
      *
      * @return array<string, int>
      */
-    private function statusCounts(?int $cityId = null): array
+    private function statusCounts(int|array|null $cityId = null): array
     {
         $raw = Voucher::query()
             ->forCity($cityId)
@@ -461,8 +481,11 @@ class VoucherController extends Controller
 
             [$serial, $hrn, $sellPrice] = array_pad($line, 3, null);
 
-            $serial = trim((string) $serial);
-            $hrn = trim((string) $hrn);
+            $serial = preg_replace('/\D/', '', trim((string) $serial));
+            if (strlen($serial) > 12) {
+                $serial = substr($serial, 0, 12);
+            }
+            $hrn = preg_replace('/\s+/', '', trim((string) $hrn));
             $sellPrice = preg_replace('/[^0-9.]/', '', trim((string) $sellPrice)) ?? '';
 
             if ($isHeader) {
@@ -473,8 +496,13 @@ class VoucherController extends Controller
                 }
             }
 
-            if ($serial === '' || $hrn === '' || $sellPrice === '' || ! is_numeric($sellPrice)) {
+            if ($serial === '' || $hrn === '') {
                 continue;
+            }
+
+            if ($sellPrice === '' || ! is_numeric($sellPrice) || (float) $sellPrice <= 0) {
+                fclose($handle);
+                throw new \RuntimeException("Baris voucher serial {$serial} memiliki harga 0 atau tidak valid. Harga voucher tidak boleh 0.");
             }
 
             $rows[] = [

@@ -5,7 +5,9 @@ import { reactive, ref } from 'vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import Pagination from '@/components/admin/Pagination.vue';
-import RegionSelect from '@/components/RegionSelect.vue';
+import SearchableCityMultiSelect, {
+    type CityOption,
+} from '@/components/SearchableCityMultiSelect.vue';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -31,6 +33,8 @@ defineOptions({
 const props = defineProps<{
     admins: Paginator<AdminKabupatenAdminRow>;
     filters: { search: string | null };
+    cities?: CityOption[];
+    is_super_admin?: boolean;
 }>();
 
 const filterState = reactive({
@@ -44,8 +48,7 @@ const form = useForm({
     name: '',
     email: '',
     password: '',
-    province_id: '' as string | number,
-    city_id: '' as string | number,
+    city_ids: [] as number[],
 });
 
 function applyFilters(): void {
@@ -59,6 +62,7 @@ function applyFilters(): void {
 function openCreate(): void {
     editing.value = null;
     form.reset();
+    form.city_ids = [];
     form.clearErrors();
     showDialog.value = true;
 }
@@ -69,8 +73,9 @@ function openEdit(admin: AdminKabupatenAdminRow): void {
     form.name = admin.name;
     form.email = admin.email;
     form.password = '';
-    form.province_id = admin.province_id ?? '';
-    form.city_id = admin.city_id ?? '';
+    form.city_ids = admin.city_ids && admin.city_ids.length > 0
+        ? [...admin.city_ids]
+        : (admin.city_id ? [admin.city_id] : []);
     showDialog.value = true;
 }
 
@@ -110,9 +115,9 @@ function destroy(admin: AdminKabupatenAdminRow): void {
         <div class="flex items-start justify-between gap-3">
             <Heading
                 title="Admin Wilayah"
-                description="Buat akun admin per wilayah/kabupaten. Voucher yang mereka input otomatis ter-map ke wilayahnya."
+                description="Akun admin per wilayah/kabupaten. Voucher yang mereka input otomatis ter-map ke wilayahnya."
             />
-            <Button @click="openCreate">
+            <Button v-if="props.is_super_admin" @click="openCreate">
                 <Plus class="size-4" />
                 Tambah Admin
             </Button>
@@ -161,9 +166,8 @@ function destroy(admin: AdminKabupatenAdminRow): void {
                     <tr>
                         <th class="px-4 py-3 font-medium">Nama</th>
                         <th class="px-4 py-3 font-medium">Email</th>
-                        <th class="px-4 py-3 font-medium">Provinsi</th>
-                        <th class="px-4 py-3 font-medium">Kabupaten/Kota</th>
-                        <th class="px-4 py-3 text-right font-medium">Aksi</th>
+                        <th class="px-4 py-3 font-medium">Wilayah Kabupaten/Kota</th>
+                        <th v-if="props.is_super_admin" class="px-4 py-3 text-right font-medium">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -176,11 +180,16 @@ function destroy(admin: AdminKabupatenAdminRow): void {
                         <td class="px-4 py-3 text-muted-foreground">
                             {{ admin.email }}
                         </td>
-                        <td class="px-4 py-3 text-muted-foreground">
-                            {{ admin.province_name ?? '-' }}
+                        <td class="px-4 py-3">
+                            <span v-if="admin.city_names" class="inline-block max-w-md truncate" :title="admin.city_names">
+                                {{ admin.city_names }}
+                            </span>
+                            <span v-else-if="admin.city_name">
+                                {{ admin.city_name }}
+                            </span>
+                            <span v-else class="text-muted-foreground">-</span>
                         </td>
-                        <td class="px-4 py-3">{{ admin.city_name ?? '-' }}</td>
-                        <td class="px-4 py-3 text-right">
+                        <td v-if="props.is_super_admin" class="px-4 py-3 text-right">
                             <Button
                                 variant="ghost"
                                 size="icon-sm"
@@ -201,7 +210,7 @@ function destroy(admin: AdminKabupatenAdminRow): void {
                     </tr>
                     <tr v-if="props.admins.data.length === 0">
                         <td
-                            colspan="5"
+                            colspan="4"
                             class="px-4 py-12 text-center text-muted-foreground"
                         >
                             <ShieldCheck class="mx-auto mb-2 size-8 opacity-40" />
@@ -258,34 +267,13 @@ function destroy(admin: AdminKabupatenAdminRow): void {
                 </div>
 
                 <div class="grid gap-2">
-                    <Label>Provinsi</Label>
-                    <RegionSelect
-                        id="admin_province"
-                        name="province_id"
-                        v-model="form.province_id"
-                        endpoint="/admin/api/regions/provinces"
-                        value-key="id"
-                        :display-label="editing?.province_name ?? null"
-                        placeholder="Pilih Provinsi"
-                        @change="form.city_id = ''"
+                    <Label>Wilayah Kabupaten/Kota yang Dikelola</Label>
+                    <SearchableCityMultiSelect
+                        v-model="form.city_ids"
+                        :cities="props.cities ?? []"
+                        placeholder="Pilih satu atau lebih kabupaten/kota..."
                     />
-                    <InputError :message="form.errors.province_id" />
-                </div>
-
-                <div class="grid gap-2">
-                    <Label>Kabupaten/Kota</Label>
-                    <RegionSelect
-                        id="admin_city"
-                        name="city_id"
-                        v-model="form.city_id"
-                        endpoint="/admin/api/regions/cities"
-                        value-key="id"
-                        :display-label="editing?.city_name ?? null"
-                        parent-param-name="province"
-                        :parent-value="form.province_id"
-                        placeholder="Pilih Kabupaten/Kota"
-                    />
-                    <InputError :message="form.errors.city_id" />
+                    <InputError :message="form.errors.city_ids" />
                 </div>
             </div>
 

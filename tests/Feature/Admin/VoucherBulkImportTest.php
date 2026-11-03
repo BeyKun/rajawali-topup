@@ -25,13 +25,13 @@ test('bulk import stores only the valid rows', function () {
 
     $this->actingAs($this->admin)
         ->post('/admin/vouchers/bulk', ['file' => $file])
-        ->assertRedirect('/admin/vouchers');
+        ->assertRedirect('/admin/vouchers/bulk');
 
     expect(Voucher::query()->count())->toBe(2);
 
     $product = Product::query()->sole();
 
-    expect((float) $product->sell_price)->toBe(25000.0);
+    expect((float) $product->sell_price)->toBe(25500.0);
 });
 
 test('bulk import rejects batch if serials already exist in inventory', function () {
@@ -119,7 +119,7 @@ test('super admin bulk import applies multiple cities to all imported vouchers',
             'file' => $file,
             'city_ids' => [$cityA->id, $cityB->id],
         ])
-        ->assertRedirect('/admin/vouchers');
+        ->assertRedirect('/admin/vouchers/bulk');
 
     expect(Voucher::query()->count())->toBe(2);
 
@@ -127,4 +127,35 @@ test('super admin bulk import applies multiple cities to all imported vouchers',
     foreach ($vouchers as $voucher) {
         expect($voucher->cities->pluck('id')->all())->toEqualCanonicalizing([$cityA->id, $cityB->id]);
     }
+});
+
+test('bulk import rejects rows with zero or negative sell price', function () {
+    $this->actingAs($this->admin)
+        ->post('/admin/vouchers/bulk', [
+            'rows' => [
+                [
+                    'serial_number' => '300338120354',
+                    'hrn' => '71125613431848001',
+                    'sell_price' => 0,
+                ],
+            ],
+        ])
+        ->assertSessionHasErrors('rows.0.sell_price');
+
+    expect(Voucher::query()->count())->toBe(0);
+});
+
+test('bulk import csv rejects file with zero sell price', function () {
+    $content = implode("\n", [
+        'serial_number,hrn,sell_price',
+        '300338120354,71125613431848001,0',
+    ]);
+
+    $file = UploadedFile::fake()->createWithContent('vouchers_zero.csv', $content);
+
+    $this->actingAs($this->admin)
+        ->post('/admin/vouchers/bulk', ['file' => $file])
+        ->assertSessionHasErrors('file');
+
+    expect(Voucher::query()->count())->toBe(0);
 });

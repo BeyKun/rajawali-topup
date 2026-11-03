@@ -44,7 +44,7 @@ it('successfully scans voucher photo and parses serial and hrn from OCR service'
             'success' => true,
             'vouchers' => [
                 [
-                    'serial_number' => '300338120354186',
+                    'serial_number' => '300338120354',
                     'hrn' => '71125613431848001',
                     'confidence' => 0.96,
                 ],
@@ -68,7 +68,7 @@ it('successfully scans voucher photo and parses serial and hrn from OCR service'
             'success' => true,
             'vouchers' => [
                 [
-                    'serial_number' => '300338120354186',
+                    'serial_number' => '300338120354',
                     'hrn' => '71125613431848001',
                     'serial_status' => 'valid',
                     'hrn_status' => 'valid',

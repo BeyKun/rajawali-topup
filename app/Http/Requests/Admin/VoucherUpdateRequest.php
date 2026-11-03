@@ -23,8 +23,13 @@ class VoucherUpdateRequest extends FormRequest
      */
     protected function prepareForValidation(): void
     {
+        $serial = preg_replace('/\D/', '', (string) $this->input('serial_number'));
+        if (strlen($serial) > 12) {
+            $serial = substr($serial, 0, 12);
+        }
+
         $data = [
-            'serial_number' => preg_replace('/\s+/', '', (string) $this->input('serial_number')),
+            'serial_number' => $serial,
         ];
 
         if ($this->filled('hrn')) {
@@ -54,7 +59,7 @@ class VoucherUpdateRequest extends FormRequest
             ],
             'hrn' => ['nullable', 'string', 'digits:17'],
             'status' => ['required', 'string', Rule::enum(VoucherStatus::class)],
-            'sell_price' => ['required', 'numeric', 'min:0'],
+            'sell_price' => ['required', 'numeric', 'gt:0'],
             'margin_percentage' => ['nullable', 'numeric', 'min:0'],
             'city_ids' => ['nullable', 'array'],
             'city_ids.*' => ['integer', 'exists:cities,id'],
@@ -77,7 +82,8 @@ class VoucherUpdateRequest extends FormRequest
             'status.enum' => 'Status voucher tidak valid.',
             'sell_price.required' => 'Harga wajib diisi.',
             'sell_price.numeric' => 'Harga harus berupa angka.',
-            'sell_price.min' => 'Harga tidak boleh negatif.',
+            'sell_price.gt' => 'Harga voucher tidak boleh 0 atau kurang.',
+            'sell_price.min' => 'Harga voucher tidak boleh 0 atau kurang.',
             'margin_percentage.numeric' => 'Persentase harga jual harus berupa angka.',
             'margin_percentage.min' => 'Persentase harga jual tidak boleh negatif.',
             'city_ids.array' => 'Format pilihan wilayah tidak valid.',

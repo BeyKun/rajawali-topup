@@ -283,6 +283,34 @@ test('deleting a banner removes both slider and popup image files', function () 
     Storage::disk('public')->assertMissing($banner->popup_image_path);
 });
 
+test('an admin can upload a dedicated portrait popup banner', function () {
+    $this->actingAs($this->admin)
+        ->post('/admin/promos/banners', [
+            'title' => 'Popup Spesial Lebaran',
+            'popup_image' => UploadedFile::fake()->image('popup_portrait.jpg', 720, 1280),
+            'is_featured' => true,
+            'is_active' => true,
+        ])
+        ->assertRedirect('/admin/promos');
+
+    $banner = PromoBanner::query()->where('title', 'Popup Spesial Lebaran')->sole();
+
+    expect($banner->is_featured)->toBeTrue()
+        ->and($banner->popup_image_path)->not->toBeNull()
+        ->and($banner->image_path)->not->toBeNull();
+
+    Storage::disk('public')->assertExists($banner->popup_image_path);
+});
+
+test('creating a popup banner fails if neither popup_image nor image is provided', function () {
+    $this->actingAs($this->admin)
+        ->post('/admin/promos/banners', [
+            'title' => 'Popup Tanpa Gambar',
+            'is_featured' => true,
+        ])
+        ->assertSessionHasErrors(['popup_image']);
+});
+
 test('a percentage promo voucher rejects discount_value over 100', function () {
     $this->actingAs($this->admin)
         ->post('/admin/promos/vouchers', promoVoucherPayload([

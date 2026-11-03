@@ -166,22 +166,6 @@ function json(value: unknown): string {
                     Coba Ulang Redeem
                 </Button>
 
-                <Button
-                    v-if="props.order.qris_url && props.order.payment_status === 'UNPAID'"
-                    variant="outline"
-                    as-child
-                >
-                    <a
-                        href="https://simulator.sandbox.midtrans.com/v2/qris/index"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="flex items-center gap-1.5"
-                    >
-                        <ExternalLink class="size-4" />
-                        Bayar via Simulator Midtrans
-                    </a>
-                </Button>
-
                 <Dialog v-if="canMarkRefunded()">
                     <DialogTrigger as-child>
                         <Button variant="default" class="bg-purple-600 hover:bg-purple-700 text-white">
@@ -435,51 +419,6 @@ function json(value: unknown): string {
                             <span v-else class="text-muted-foreground">-</span>
                         </dd>
                     </dl>
-
-                    <div
-                        v-if="props.order.qris_url"
-                        class="mt-4 rounded-xl border bg-muted/30 p-3.5 flex flex-col sm:flex-row items-center gap-4"
-                    >
-                        <div class="rounded-lg bg-white p-2 border shadow-xs shrink-0">
-                            <img
-                                :src="props.order.qris_url"
-                                alt="QR Code QRIS"
-                                class="size-28 object-contain"
-                            />
-                        </div>
-                        <div class="space-y-1.5 text-center sm:text-left">
-                            <p class="text-xs font-semibold text-foreground">
-                                Scan atau Bayar via Simulator Midtrans
-                            </p>
-                            <p class="text-xs text-muted-foreground leading-relaxed">
-                                URL gambar QRIS di atas dapat disalin lalu ditempelkan pada Midtrans QRIS Simulator untuk menyelesaikan pembayaran transaksi ini dari admin.
-                            </p>
-                            <div class="pt-1 flex flex-wrap gap-2 justify-center sm:justify-start">
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    @click="copyQrisUrl"
-                                >
-                                    <component :is="copied ? Check : Copy" class="size-3.5 mr-1" />
-                                    {{ copied ? 'URL Tersalin!' : 'Salin URL QRIS' }}
-                                </Button>
-                                <Button
-                                    v-if="props.order.payment_status === 'UNPAID'"
-                                    size="sm"
-                                    as-child
-                                >
-                                    <a
-                                        href="https://simulator.sandbox.midtrans.com/v2/qris/index"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                    >
-                                        <ExternalLink class="size-3.5 mr-1" />
-                                        Buka Simulator QRIS
-                                    </a>
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
                 </CardContent>
             </Card>
         </div>

@@ -183,6 +183,8 @@ export type AdminKabupatenAdminRow = {
     province_name: string | null;
     city_id: number | null;
     city_name: string | null;
+    city_ids?: number[];
+    city_names?: string;
     created_at: string | null;
 };
 

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\PromoBannerRequest;
 use App\Models\PromoBanner;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
@@ -22,14 +23,18 @@ class PromoBannerController extends Controller
      */
     public function store(PromoBannerRequest $request): RedirectResponse
     {
-        $path = $this->storeOptimizedImage($request->file('image'));
-        $popupPath = $request->hasFile('popup_image')
-            ? $this->storeOptimizedImage($request->file('popup_image'))
-            : null;
-
         $isFeatured = $request->boolean('is_featured');
         if ($isFeatured) {
             PromoBanner::query()->where('is_featured', true)->update(['is_featured' => false]);
+            $file = $request->file('popup_image') ?? $request->file('image');
+            $stored = $this->storeOptimizedImage($file);
+            $path = $stored;
+            $popupPath = $stored;
+        } else {
+            $path = $this->storeOptimizedImage($request->file('image'));
+            $popupPath = $request->hasFile('popup_image')
+                ? $this->storeOptimizedImage($request->file('popup_image'))
+                : null;
         }
 
         PromoBanner::query()->create([
@@ -43,7 +48,8 @@ class PromoBannerController extends Controller
             'sort_order' => $request->integer('sort_order'),
         ]);
 
-        Inertia::flash('toast', ['type' => 'success', 'message' => 'Banner promo berhasil diunggah.']);
+        $message = $isFeatured ? 'Popup banner berhasil diunggah.' : 'Banner promo berhasil diunggah.';
+        Inertia::flash('toast', ['type' => 'success', 'message' => $message]);
 
         return to_route('admin.promos.index');
     }
@@ -67,21 +73,35 @@ class PromoBannerController extends Controller
             'sort_order' => $request->integer('sort_order'),
         ];
 
-        if ($request->hasFile('image')) {
-            Storage::disk('public')->delete($banner->image_path);
-            $attributes['image_path'] = $this->storeOptimizedImage($request->file('image'));
-        }
-
-        if ($request->hasFile('popup_image')) {
-            if ($banner->popup_image_path) {
-                Storage::disk('public')->delete($banner->popup_image_path);
+        if ($isFeatured) {
+            $newFile = $request->file('popup_image') ?? $request->file('image');
+            if ($newFile) {
+                Storage::disk('public')->delete($banner->image_path);
+                if ($banner->popup_image_path && $banner->popup_image_path !== $banner->image_path) {
+                    Storage::disk('public')->delete($banner->popup_image_path);
+                }
+                $stored = $this->storeOptimizedImage($newFile);
+                $attributes['image_path'] = $stored;
+                $attributes['popup_image_path'] = $stored;
             }
-            $attributes['popup_image_path'] = $this->storeOptimizedImage($request->file('popup_image'));
+        } else {
+            if ($request->hasFile('image')) {
+                Storage::disk('public')->delete($banner->image_path);
+                $attributes['image_path'] = $this->storeOptimizedImage($request->file('image'));
+            }
+
+            if ($request->hasFile('popup_image')) {
+                if ($banner->popup_image_path && $banner->popup_image_path !== $banner->image_path) {
+                    Storage::disk('public')->delete($banner->popup_image_path);
+                }
+                $attributes['popup_image_path'] = $this->storeOptimizedImage($request->file('popup_image'));
+            }
         }
 
         $banner->update($attributes);
 
-        Inertia::flash('toast', ['type' => 'success', 'message' => 'Banner promo berhasil diperbarui.']);
+        $message = $isFeatured ? 'Popup banner berhasil diperbarui.' : 'Banner promo berhasil diperbarui.';
+        Inertia::flash('toast', ['type' => 'success', 'message' => $message]);
 
         return to_route('admin.promos.index');
     }
@@ -92,13 +112,14 @@ class PromoBannerController extends Controller
     public function destroy(PromoBanner $banner): RedirectResponse
     {
         Storage::disk('public')->delete($banner->image_path);
-        if ($banner->popup_image_path) {
+        if ($banner->popup_image_path && $banner->popup_image_path !== $banner->image_path) {
             Storage::disk('public')->delete($banner->popup_image_path);
         }
 
         $banner->delete();
 
-        Inertia::flash('toast', ['type' => 'success', 'message' => 'Banner promo berhasil dihapus.']);
+        $message = $banner->is_featured ? 'Popup banner berhasil dihapus.' : 'Banner promo berhasil dihapus.';
+        Inertia::flash('toast', ['type' => 'success', 'message' => $message]);
 
         return to_route('admin.promos.index');
     }
@@ -106,7 +127,7 @@ class PromoBannerController extends Controller
     /**
      * Store and optionally resize/compress the uploaded banner for fast mobile loading.
      */
-    protected function storeOptimizedImage(\Illuminate\Http\UploadedFile $file): string
+    protected function storeOptimizedImage(UploadedFile $file): string
     {
         $path = $file->store('promo-banners', 'public');
         $fullPath = Storage::disk('public')->path($path);

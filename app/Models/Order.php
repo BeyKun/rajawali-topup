@@ -97,12 +97,18 @@ class Order extends Model
     }
 
     /**
-     * Limit the query to orders whose product belongs to a city.
+     * Limit the query to orders whose product belongs to a city or list of cities.
      *
      * @param  Builder<Order>  $query
      */
-    public function scopeForCity(Builder $query, ?int $cityId): Builder
+    public function scopeForCity(Builder $query, int|array|null $cityId): Builder
     {
-        return $cityId === null ? $query : $query->whereHas('product', fn ($product) => $product->where('city_id', $cityId));
+        if ($cityId === null || (is_array($cityId) && empty($cityId))) {
+            return $query;
+        }
+
+        $cityIds = is_array($cityId) ? $cityId : [$cityId];
+
+        return $query->whereHas('product', fn ($product) => $product->whereIn('city_id', $cityIds));
     }
 }

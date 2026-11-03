@@ -89,31 +89,16 @@ onUnmounted(() => {
 
 const mainNavItems = computed<NavItem[]>(() => {
     if (isAdmin.value) {
-        const items: NavItem[] = [
+        return [
             {
                 title: 'Dashboard',
                 href: '/admin/dashboard',
                 icon: LayoutGrid,
             },
             {
-                title: 'Katalog Paket',
-                href: '/admin/products',
-                icon: Package,
-            },
-            {
                 title: 'Voucher',
                 href: '/admin/vouchers',
                 icon: Ticket,
-            },
-            {
-                title: 'Promo & Voucher',
-                href: '/admin/promos',
-                icon: BadgePercent,
-            },
-            {
-                title: 'User Outlet',
-                href: '/admin/outlets',
-                icon: Store,
             },
             {
                 title: 'Transaksi',
@@ -125,17 +110,27 @@ const mainNavItems = computed<NavItem[]>(() => {
                         : undefined,
                 badgeVariant: 'destructive',
             },
-        ];
-
-        if (isSuperAdmin.value) {
-            items.push({
+            {
+                title: 'Promo',
+                href: '/admin/promos',
+                icon: BadgePercent,
+            },
+            {
+                title: 'Katalog Paket',
+                href: '/admin/products',
+                icon: Package,
+            },
+            {
+                title: 'User Outlet',
+                href: '/admin/outlets',
+                icon: Store,
+            },
+            {
                 title: 'Admin Wilayah',
                 href: '/admin/admins',
                 icon: ShieldCheck,
-            });
-        }
-
-        return items;
+            },
+        ];
     }
 
     return [
