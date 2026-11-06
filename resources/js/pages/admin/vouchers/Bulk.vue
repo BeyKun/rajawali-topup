@@ -4,6 +4,7 @@ import {
     AlertCircle,
     ArrowLeft,
     Camera,
+    CheckCheck,
     CheckCircle2,
     DollarSign,
     Download,
@@ -13,6 +14,7 @@ import {
     Loader2,
     Plus,
     RefreshCw,
+    ScanSearch,
     Sparkles,
     Trash2,
     UploadCloud,
@@ -223,6 +225,9 @@ async function startOcrScan(file: File): Promise<void> {
 
         scannedRows.value = serverResult.vouchers.map((r) => {
             let serial = cleanDigits(r.serial_number);
+            if (serial.length > 12) {
+                serial = serial.slice(0, 12);
+            }
             return {
                 ...r,
                 serial_number: formatSerialNumber(serial),
@@ -256,6 +261,9 @@ async function startOcrScan(file: File): Promise<void> {
 
             scannedRows.value = rows.map((r) => {
                 let serial = cleanDigits(r.serial_number);
+                if (serial.length > 12) {
+                    serial = serial.slice(0, 12);
+                }
                 return {
                     ...r,
                     serial_number: formatSerialNumber(serial),
@@ -298,6 +306,9 @@ function addManualRow(): void {
 function onSerialInput(row: ScannedVoucherRow, event: Event): void {
     handleFormattedInput(event, formatSerialNumber, (val) => {
         let clean = cleanDigits(val);
+        if (clean.length > 12) {
+            clean = clean.slice(0, 12);
+        }
         row.serial_number = formatSerialNumber(clean);
     });
 }
@@ -326,9 +337,164 @@ function clearAllScanned(): void {
     }
 }
 
+const isCheckingAll = ref(false);
+const checkAllProgress = ref({ current: 0, total: 0 });
+
+function getCsrfToken(): string {
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    if (meta) {
+        const content = meta.getAttribute('content');
+        if (content) return content;
+    }
+    const match = document.cookie.match(/(^|;\s*)XSRF-TOKEN=([^;]+)/);
+    return match ? decodeURIComponent(match[2]) : '';
+}
+
+async function checkSingleVoucher(row: ScannedVoucherRow): Promise<void> {
+    const serial = cleanDigits(row.serial_number);
+    if (!serial) {
+        toast.error('Nomor seri tidak boleh kosong.');
+        return;
+    }
+    if (serial.length !== 12) {
+        toast.warning(`Nomor seri harus 12 digit (saat ini ${serial.length} digit).`);
+        return;
+    }
+
+    row.check_loading = true;
+
+    try {
+        const response = await fetch('/admin/vouchers/check', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': getCsrfToken(),
+                'X-XSRF-TOKEN': getCsrfToken(),
+            },
+            body: JSON.stringify({
+                serial_number: serial,
+            }),
+        });
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => null);
+            const msg = errData?.message || (errData?.errors?.serial_number?.[0]) || `HTTP ${response.status}`;
+            row.check_result = {
+                is_valid: false,
+                status_code: -1,
+                status_message: msg,
+                serial_number: serial,
+            };
+            toast.error(`Pengecekan SN ${serial} gagal: ${msg}`);
+            return;
+        }
+
+        const data = await response.json();
+        row.check_result = data;
+
+        if (data.is_valid) {
+            toast.success(`SN ${serial}: Tersedia (${data.name || 'Paket Valid'})`);
+        } else {
+            toast.warning(`SN ${serial}: ${data.status_message} (kode ${data.status_code})`);
+        }
+    } catch (e: any) {
+        row.check_result = {
+            is_valid: false,
+            status_code: -1,
+            status_message: e?.message || 'Gagal koneksi',
+            serial_number: serial,
+        };
+        toast.error(`Gagal menghubungi server untuk SN ${serial}`);
+    } finally {
+        row.check_loading = false;
+    }
+}
+
+async function checkAllVouchers(): Promise<void> {
+    if (scannedRows.value.length === 0) return;
+    if (isCheckingAll.value) return;
+
+    isCheckingAll.value = true;
+    checkAllProgress.value = { current: 0, total: scannedRows.value.length };
+
+    let availableCount = 0;
+    let invalidCount = 0;
+
+    for (let i = 0; i < scannedRows.value.length; i++) {
+        const row = scannedRows.value[i];
+        checkAllProgress.value.current = i + 1;
+
+        const serial = cleanDigits(row.serial_number);
+        if (!serial || serial.length !== 12) {
+            row.check_result = {
+                is_valid: false,
+                status_code: -1,
+                status_message: serial ? 'SN != 12 digit' : 'SN Kosong',
+                serial_number: serial,
+            };
+            invalidCount++;
+            continue;
+        }
+
+        row.check_loading = true;
+        try {
+            const response = await fetch('/admin/vouchers/check', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': getCsrfToken(),
+                    'X-XSRF-TOKEN': getCsrfToken(),
+                },
+                body: JSON.stringify({
+                    serial_number: serial,
+                }),
+            });
+
+            if (!response.ok) {
+                const errData = await response.json().catch(() => null);
+                row.check_result = {
+                    is_valid: false,
+                    status_code: -1,
+                    status_message: errData?.message || `HTTP ${response.status}`,
+                    serial_number: serial,
+                };
+                invalidCount++;
+            } else {
+                const data = await response.json();
+                row.check_result = data;
+                if (data.is_valid) {
+                    availableCount++;
+                } else {
+                    invalidCount++;
+                }
+            }
+        } catch {
+            row.check_result = {
+                is_valid: false,
+                status_code: -1,
+                status_message: 'Koneksi error',
+                serial_number: serial,
+            };
+            invalidCount++;
+        } finally {
+            row.check_loading = false;
+        }
+
+        // Delay 250ms antar-panggilan agar aman terhadap Telkomsel API
+        if (i < scannedRows.value.length - 1) {
+            await new Promise((r) => setTimeout(r, 250));
+        }
+    }
+
+    isCheckingAll.value = false;
+    toast.info(`Selesai mengecek: ${availableCount} Tersedia, ${invalidCount} Bermasalah.`);
+}
+
 const validVouchersCount = computed(() => {
     return scannedRows.value.filter(
-        (r) => cleanDigits(r.serial_number).length >= 12 && cleanDigits(r.hrn).length >= 14 && Number(r.sell_price || 0) > 0,
+        (r) => cleanDigits(r.serial_number).length === 12 && cleanDigits(r.hrn).length >= 14 && Number(r.sell_price || 0) > 0,
     ).length;
 });
 
@@ -340,7 +506,7 @@ const isPhotoSubmitValid = computed(() => {
     return (
         scannedRows.value.length > 0 &&
         scannedRows.value.every(
-            (r) => cleanDigits(r.serial_number).length >= 12 && cleanDigits(r.hrn) !== '' && Number(r.sell_price || 0) > 0,
+            (r) => cleanDigits(r.serial_number).length === 12 && cleanDigits(r.hrn) !== '' && Number(r.sell_price || 0) > 0,
         )
     );
 });
@@ -369,6 +535,9 @@ function parseFriendlyError(errors: Record<string, any>): string {
 function submitPhotoRows(): void {
     const preparedRows = scannedRows.value.map((r) => {
         let serial = cleanDigits(r.serial_number);
+        if (serial.length > 12) {
+            serial = serial.slice(0, 12);
+        }
         return {
             serial_number: serial,
             hrn: cleanDigits(r.hrn),
@@ -381,6 +550,15 @@ function submitPhotoRows(): void {
         showSubmitModal.value = true;
         submitStatus.value = 'error';
         submitErrorMessage.value = `Terdapat ${zeroPriceRows.length} voucher dengan harga Rp 0. Semua voucher harus memiliki harga jual lebih dari 0. Anda dapat mengisi harga langsung pada tabel atau menggunakan tombol "Set Satu Harga".`;
+        return;
+    }
+
+    const invalidCheckedRows = scannedRows.value.filter((r) => r.check_result && !r.check_result.is_valid);
+    if (invalidCheckedRows.length > 0) {
+        showSubmitModal.value = true;
+        submitStatus.value = 'error';
+        const invalidSerials = invalidCheckedRows.map((r) => `• No Seri ${cleanDigits(r.serial_number)}: ${r.check_result?.status_message || 'Tidak Valid'}`).join('\n');
+        submitErrorMessage.value = `Terdapat ${invalidCheckedRows.length} voucher yang sudah dicek dan berstatus tidak valid / sudah digunakan:\n${invalidSerials}\nSilakan hapus atau perbaiki nomor seri tersebut dari tabel sebelum melanjutkan import.`;
         return;
     }
 
@@ -651,6 +829,20 @@ function resetAndUploadMore(): void {
                                 type="button"
                                 variant="outline"
                                 size="sm"
+                                class="h-8 gap-1.5 text-xs text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800 hover:bg-sky-50 dark:hover:bg-sky-950/50"
+                                :disabled="scannedRows.length === 0 || isCheckingAll"
+                                @click="checkAllVouchers"
+                            >
+                                <Loader2 v-if="isCheckingAll" class="size-3.5 animate-spin" />
+                                <ScanSearch v-else class="size-3.5" />
+                                <span v-if="isCheckingAll">Mengecek ({{ checkAllProgress.current }}/{{ checkAllProgress.total }})...</span>
+                                <span v-else>Cek Semua Validitas</span>
+                            </Button>
+
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
                                 class="h-8 gap-1.5 text-xs"
                                 @click="openSetPriceDialog"
                             >
@@ -677,11 +869,12 @@ function resetAndUploadMore(): void {
                             <thead class="bg-muted/40 text-left text-muted-foreground border-b">
                                 <tr>
                                     <th class="py-2.5 px-3 font-medium w-10">No</th>
-                                    <th class="py-2.5 px-3 font-medium min-w-[190px]">No. Seri Voucher</th>
-                                    <th class="py-2.5 px-3 font-medium min-w-[210px]">Kode Voucher (HRN)</th>
-                                    <th class="py-2.5 px-3 font-medium min-w-[150px]">Harga Jual Dasar (Rp)</th>
-                                    <th class="py-2.5 px-3 font-medium min-w-[150px]">Total Harga Jual (+{{ fixedMargin }}%)</th>
-                                    <th class="py-2.5 px-3 font-medium w-24">Status</th>
+                                    <th class="py-2.5 px-3 font-medium min-w-[180px]">No. Seri Voucher</th>
+                                    <th class="py-2.5 px-3 font-medium min-w-[200px]">Kode Voucher (HRN)</th>
+                                    <th class="py-2.5 px-3 font-medium min-w-[140px]">Harga Jual Dasar (Rp)</th>
+                                    <th class="py-2.5 px-3 font-medium min-w-[140px]">Total (+{{ fixedMargin }}%)</th>
+                                    <th class="py-2.5 px-3 font-medium min-w-[160px]">Validasi Telkomsel</th>
+                                    <th class="py-2.5 px-3 font-medium w-20">Format</th>
                                     <th class="py-2.5 px-3 font-medium w-12 text-center">Aksi</th>
                                 </tr>
                             </thead>
@@ -689,7 +882,14 @@ function resetAndUploadMore(): void {
                                 <tr
                                     v-for="(row, idx) in scannedRows"
                                     :key="row.id"
-                                    class="hover:bg-muted/20 transition-colors"
+                                    :class="[
+                                        'transition-colors',
+                                        row.check_result && !row.check_result.is_valid
+                                            ? 'bg-rose-50/70 dark:bg-rose-950/20 hover:bg-rose-100/60 dark:hover:bg-rose-950/30'
+                                            : (row.check_result && row.check_result.is_valid
+                                                ? 'bg-emerald-50/40 dark:bg-emerald-950/10 hover:bg-emerald-50/70 dark:hover:bg-emerald-950/20'
+                                                : 'hover:bg-muted/20')
+                                    ]"
                                 >
                                     <td class="py-2 px-3 font-mono text-muted-foreground">
                                         {{ idx + 1 }}
@@ -699,17 +899,17 @@ function resetAndUploadMore(): void {
                                             <Input
                                                 :model-value="row.serial_number"
                                                 placeholder="Contoh: 3003 3812 0354"
-                                                maxlength="24"
+                                                maxlength="14"
                                                 class="h-8 font-mono text-xs"
                                                 @input="onSerialInput(row, $event)"
                                             />
                                             <div class="flex items-center gap-1.5 text-[10px]">
                                                 <span
-                                                    :class="cleanDigits(row.serial_number).length >= 12
+                                                    :class="cleanDigits(row.serial_number).length === 12
                                                         ? 'text-emerald-600 dark:text-emerald-400 font-medium'
                                                         : 'text-amber-600 dark:text-amber-400'"
                                                 >
-                                                    {{ cleanDigits(row.serial_number).length }} digit
+                                                    {{ cleanDigits(row.serial_number).length }}/12 digit
                                                 </span>
                                             </div>
                                         </div>
@@ -767,6 +967,74 @@ function resetAndUploadMore(): void {
                                             {{ formatRupiah(Math.round(Number(row.sell_price || 0) * (1 + fixedMargin / 100))) }}
                                         </div>
                                     </td>
+                                    <!-- Tombol & Status Validasi Telkomsel -->
+                                    <td class="py-2 px-3">
+                                        <!-- State 1: Sedang cek -->
+                                        <div v-if="row.check_loading" class="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                            <Loader2 class="size-3.5 animate-spin text-sky-600 dark:text-sky-400" />
+                                            <span>Mengecek...</span>
+                                        </div>
+
+                                        <!-- State 2: Sudah ada hasil cek -->
+                                        <div v-else-if="row.check_result" class="flex items-center justify-between gap-1">
+                                            <div class="space-y-0.5">
+                                                <span
+                                                    v-if="row.check_result.is_valid"
+                                                    class="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400"
+                                                >
+                                                    <CheckCircle2 class="size-3.5" /> Tersedia
+                                                </span>
+                                                <span
+                                                    v-else-if="row.check_result.status_code === 3"
+                                                    class="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600 dark:text-rose-400"
+                                                >
+                                                    <AlertCircle class="size-3.5" /> Sudah Digunakan
+                                                </span>
+                                                <span
+                                                    v-else
+                                                    class="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600 dark:text-rose-400"
+                                                >
+                                                    <AlertCircle class="size-3.5" /> {{ row.check_result.status_message || 'Voucher Invalid' }}
+                                                </span>
+
+                                                <div
+                                                    v-if="row.check_result.is_valid && (row.check_result.region || row.check_result.name)"
+                                                    class="text-[10px] text-muted-foreground line-clamp-1 max-w-[130px]"
+                                                    :title="`${row.check_result.name || ''} ${row.check_result.description || ''} (${row.check_result.region || ''})`"
+                                                >
+                                                    {{ row.check_result.region || row.check_result.name }}
+                                                </div>
+                                            </div>
+
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                class="size-6 text-muted-foreground hover:text-foreground shrink-0"
+                                                title="Cek ulang ke Telkomsel"
+                                                :disabled="isCheckingAll"
+                                                @click="checkSingleVoucher(row)"
+                                            >
+                                                <RefreshCw class="size-3" />
+                                            </Button>
+                                        </div>
+
+                                        <!-- State 3: Belum dicek -> Tombol Cek Validitas -->
+                                        <div v-else class="flex items-center gap-1.5">
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                class="h-7 px-2 text-[11px] gap-1 font-medium text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800 hover:bg-sky-50 dark:hover:bg-sky-950/50"
+                                                :disabled="cleanDigits(row.serial_number).length !== 12 || isCheckingAll"
+                                                @click="checkSingleVoucher(row)"
+                                            >
+                                                <ScanSearch class="size-3" />
+                                                Cek Valid
+                                            </Button>
+                                        </div>
+                                    </td>
+                                    <!-- Format Status -->
                                     <td class="py-2 px-3">
                                         <span
                                             v-if="cleanDigits(row.serial_number).length === 12 && cleanDigits(row.hrn).length >= 14 && Number(row.sell_price || 0) > 0"
@@ -795,7 +1063,7 @@ function resetAndUploadMore(): void {
                                     </td>
                                 </tr>
                                 <tr v-if="scannedRows.length === 0">
-                                    <td colspan="7" class="py-8 text-center text-muted-foreground">
+                                    <td colspan="8" class="py-8 text-center text-muted-foreground">
                                         Belum ada voucher yang dipindai.
                                     </td>
                                 </tr>

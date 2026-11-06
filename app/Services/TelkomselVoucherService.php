@@ -59,7 +59,11 @@ class TelkomselVoucherService
      */
     public function checkVoucher(string $serialNumber): array
     {
-        $serialNumber = trim($serialNumber);
+        $clean = (string) preg_replace('/\D/', '', trim($serialNumber));
+        if (strlen($clean) > 12) {
+            $clean = substr($clean, 0, 12);
+        }
+        $serialNumber = $clean !== '' ? $clean : trim($serialNumber);
 
         /** @var array<string, mixed> $payload */
         $payload = [

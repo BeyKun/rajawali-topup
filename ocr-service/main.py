@@ -55,8 +55,8 @@ def strip_labels(s: str) -> str:
 
 def extract_serial_from_text(text: str) -> Optional[str]:
     """
-    Extract serial number (typically 12 to 16 digits) from candidate line.
-    Preserves all 12-16 digits (e.g. 12 digits like 300338120354 or 15 digits like 500730332927269).
+    Extract serial number from candidate line.
+    Rule: Only the first 12 digits are used; any trailing digits (e.g. 3 digits) are discarded.
     """
     cleaned = strip_labels(text)
     norm = sanitize_ocr_confusion(cleaned)
@@ -76,7 +76,12 @@ def extract_serial_from_text(text: str) -> Optional[str]:
         result = digits
 
     if result:
+        # Serial number only uses the first 12 digits (trailing 3 digits are not used)
+        if len(result) > 12:
+            result = result[:12]
         return result
+
+    return None
 
     return None
 

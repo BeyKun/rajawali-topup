@@ -77,7 +77,11 @@ const checkError = ref<string | null>(null);
 
 function onSerialInput(event: Event): void {
     handleFormattedInput(event, formatSerialNumber, (val) => {
-        form.serial_number = val;
+        let clean = cleanDigits(val);
+        if (clean.length > 12) {
+            clean = clean.slice(0, 12);
+        }
+        form.serial_number = formatSerialNumber(clean);
     });
 }
 
@@ -146,13 +150,13 @@ function submit(): void {
                 @submit.prevent="submit"
             >
                 <div class="grid gap-2">
-                    <Label for="serial_number">Serial Number (12-15 digit)</Label>
+                    <Label for="serial_number">Serial Number (12 digit)</Label>
                     <div class="flex gap-2">
                         <Input
                             id="serial_number"
                             :model-value="form.serial_number"
                             inputmode="numeric"
-                            maxlength="24"
+                            maxlength="14"
                             placeholder="3003 3812 0354"
                             @input="onSerialInput"
                         />

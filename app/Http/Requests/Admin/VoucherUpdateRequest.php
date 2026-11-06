@@ -24,6 +24,9 @@ class VoucherUpdateRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $serial = preg_replace('/\D/', '', (string) $this->input('serial_number'));
+        if (strlen($serial) > 12) {
+            $serial = substr($serial, 0, 12);
+        }
 
         $data = [
             'serial_number' => $serial,
@@ -51,7 +54,7 @@ class VoucherUpdateRequest extends FormRequest
             'serial_number' => [
                 'required',
                 'string',
-                'digits_between:12,20',
+                'digits:12',
                 Rule::unique('vouchers', 'serial_number')->ignore($voucherId),
             ],
             'hrn' => ['nullable', 'string', 'digits_between:14,20'],

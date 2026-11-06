@@ -11,35 +11,35 @@ it('extracts all 5 vouchers correctly from the sample voucher strip', function (
 
     $expectedVouchers = [
         [
-            'serial_number' => '500730332927269',
+            'serial_number' => '500730332927',
             'hrn' => '92225414690447797',
             'confidence' => 0.99,
             'serial_status' => 'valid',
             'hrn_status' => 'valid',
         ],
         [
-            'serial_number' => '500730332928184',
+            'serial_number' => '500730332928',
             'hrn' => '33925819300346175',
             'confidence' => 0.98,
             'serial_status' => 'valid',
             'hrn_status' => 'valid',
         ],
         [
-            'serial_number' => '500730332929880',
+            'serial_number' => '500730332929',
             'hrn' => '97425213340240397',
             'confidence' => 0.96,
             'serial_status' => 'valid',
             'hrn_status' => 'valid',
         ],
         [
-            'serial_number' => '500730332930914',
+            'serial_number' => '500730332930',
             'hrn' => '87322812750846634',
             'confidence' => 0.97,
             'serial_status' => 'valid',
             'hrn_status' => 'valid',
         ],
         [
-            'serial_number' => '500730332931048',
+            'serial_number' => '500730332931',
             'hrn' => '96222412030145418',
             'confidence' => 0.98,
             'serial_status' => 'valid',
@@ -146,15 +146,15 @@ it('dispatches bulk store job with the extracted 5 vouchers from sample image', 
             return false;
         }
 
-        return $job->rows[0]['serial_number'] === '500730332927269'
+        return $job->rows[0]['serial_number'] === '500730332927'
             && $job->rows[0]['hrn'] === '92225414690447797'
-            && $job->rows[1]['serial_number'] === '500730332928184'
+            && $job->rows[1]['serial_number'] === '500730332928'
             && $job->rows[1]['hrn'] === '33925819300346175'
-            && $job->rows[2]['serial_number'] === '500730332929880'
+            && $job->rows[2]['serial_number'] === '500730332929'
             && $job->rows[2]['hrn'] === '97425213340240397'
-            && $job->rows[3]['serial_number'] === '500730332930914'
+            && $job->rows[3]['serial_number'] === '500730332930'
             && $job->rows[3]['hrn'] === '87322812750846634'
-            && $job->rows[4]['serial_number'] === '500730332931048'
+            && $job->rows[4]['serial_number'] === '500730332931'
             && $job->rows[4]['hrn'] === '96222412030145418';
     });
 });

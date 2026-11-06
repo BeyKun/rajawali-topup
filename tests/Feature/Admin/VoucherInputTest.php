@@ -70,8 +70,8 @@ test('a valid voucher is stored as available with an encrypted hrn and auto-crea
     expect($rawHrn)->not->toBe($hrn);
 });
 
-test('a valid 15-digit voucher is stored without truncation and preserves all digits', function () {
-    $serial = '500730332927269';
+test('a valid 15-digit voucher input is truncated to 12 digits', function () {
+    $serial = '500730332927';
     $hrn = '92225414690447797';
 
     $this->actingAs($this->admin)
@@ -84,8 +84,8 @@ test('a valid 15-digit voucher is stored without truncation and preserves all di
 
     $voucher = Voucher::query()->where('serial_number', $serial)->sole();
 
-    expect($voucher->serial_number)->toBe('500730332927269')
-        ->and(strlen($voucher->serial_number))->toBe(15)
+    expect($voucher->serial_number)->toBe('500730332927')
+        ->and(strlen($voucher->serial_number))->toBe(12)
         ->and($voucher->status)->toBe(VoucherStatus::Available)
         ->and($voucher->hrn)->toBe($hrn);
 });

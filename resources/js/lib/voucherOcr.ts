@@ -1,5 +1,17 @@
 import { createWorker, PSM } from 'tesseract.js';
 
+export interface VoucherCheckResult {
+    is_valid: boolean;
+    status_code: number;
+    status_message: string;
+    serial_number: string;
+    name?: string;
+    description?: string;
+    validity?: string;
+    expired_date?: string;
+    region?: string;
+}
+
 export interface ScannedVoucherRow {
     id: string;
     serial_number: string;
@@ -7,6 +19,8 @@ export interface ScannedVoucherRow {
     sell_price: number;
     serial_status: 'valid' | 'warning' | 'invalid';
     hrn_status: 'valid' | 'warning' | 'invalid';
+    check_loading?: boolean;
+    check_result?: VoucherCheckResult | null;
 }
 
 export interface OcrProgress {
@@ -173,7 +187,12 @@ export function extractSerialCandidate(rawText: string): { digits: string; isExp
         const matchStr = tselMatch ? tselMatch[1] : labelMatch![1];
         let sDigits = matchStr.replace(/\D/g, '');
 
-        if (sDigits.length >= 12 && sDigits.length <= 18) {
+        // Validasi serial number: potong ke 12 digit pertama, 3 angka di belakang tidak digunakan
+        if (sDigits.length > 12) {
+            sDigits = sDigits.slice(0, 12);
+        }
+
+        if (sDigits.length === 12) {
             return {
                 digits: sDigits,
                 isExplicitSerial: true,
@@ -535,7 +554,7 @@ export async function scanVoucherImage(
                 serial_number: s.digits,
                 hrn: hrnDigits,
                 sell_price: 25000,
-                serial_status: (s.digits.length >= 12 && s.digits.length <= 18) ? 'valid' : 'warning',
+                serial_status: s.digits.length === 12 ? 'valid' : 'warning',
                 hrn_status: hrnDigits.length >= 14 ? 'valid' : 'warning',
             });
         }

@@ -20,8 +20,13 @@ class VoucherCheckRequest extends FormRequest
      */
     protected function prepareForValidation(): void
     {
+        $clean = preg_replace('/\D/', '', (string) $this->input('serial_number'));
+        if (strlen($clean) > 12) {
+            $clean = substr($clean, 0, 12);
+        }
+
         $this->merge([
-            'serial_number' => preg_replace('/\s+/', '', (string) $this->input('serial_number')),
+            'serial_number' => $clean,
         ]);
     }
 
@@ -33,7 +38,7 @@ class VoucherCheckRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'serial_number' => ['required', 'string', 'max:50'],
+            'serial_number' => ['required', 'string', 'digits:12'],
         ];
     }
 
