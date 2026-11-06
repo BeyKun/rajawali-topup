@@ -173,12 +173,7 @@ export function extractSerialCandidate(rawText: string): { digits: string; isExp
         const matchStr = tselMatch ? tselMatch[1] : labelMatch![1];
         let sDigits = matchStr.replace(/\D/g, '');
 
-        // Rule 12: For serial numbers longer than 12 digits, discard the trailing digits (store first 12 digits)
-        if (sDigits.length > 12) {
-            sDigits = sDigits.slice(0, 12);
-        }
-
-        if (sDigits.length === 12) {
+        if (sDigits.length >= 12 && sDigits.length <= 18) {
             return {
                 digits: sDigits,
                 isExplicitSerial: true,
@@ -540,7 +535,7 @@ export async function scanVoucherImage(
                 serial_number: s.digits,
                 hrn: hrnDigits,
                 sell_price: 25000,
-                serial_status: s.digits.length === 12 ? 'valid' : 'warning',
+                serial_status: (s.digits.length >= 12 && s.digits.length <= 18) ? 'valid' : 'warning',
                 hrn_status: hrnDigits.length >= 14 ? 'valid' : 'warning',
             });
         }

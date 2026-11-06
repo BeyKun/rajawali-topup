@@ -146,13 +146,13 @@ function submit(): void {
                 @submit.prevent="submit"
             >
                 <div class="grid gap-2">
-                    <Label for="serial_number">Serial Number (12 digit)</Label>
+                    <Label for="serial_number">Serial Number (12-15 digit)</Label>
                     <div class="flex gap-2">
                         <Input
                             id="serial_number"
                             :model-value="form.serial_number"
                             inputmode="numeric"
-                            maxlength="14"
+                            maxlength="24"
                             placeholder="3003 3812 0354"
                             @input="onSerialInput"
                         />

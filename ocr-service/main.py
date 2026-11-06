@@ -56,7 +56,7 @@ def strip_labels(s: str) -> str:
 def extract_serial_from_text(text: str) -> Optional[str]:
     """
     Extract serial number (typically 12 to 16 digits) from candidate line.
-    Rule: if serial number is longer than 12 digits, truncate to first 12 digits.
+    Preserves all 12-16 digits (e.g. 12 digits like 300338120354 or 15 digits like 500730332927269).
     """
     cleaned = strip_labels(text)
     norm = sanitize_ocr_confusion(cleaned)
@@ -72,13 +72,10 @@ def extract_serial_from_text(text: str) -> Optional[str]:
         if 12 <= len(digits) <= 18:
             result = digits
     # 3. Direct 12 or 15 or 16 digit number (common serial lengths)
-    elif len(digits) in (12, 15, 16):
+    elif len(digits) in (12, 13, 14, 15, 16):
         result = digits
 
     if result:
-        # Poin 12: Potong jika > 12 digit
-        if len(result) > 12:
-            result = result[:12]
         return result
 
     return None

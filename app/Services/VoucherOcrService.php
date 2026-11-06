@@ -67,14 +67,11 @@ class VoucherOcrService
             $formattedVouchers = [];
             foreach ($rawVouchers as $idx => $v) {
                 $serial = preg_replace('/\D/', '', (string) ($v['serial_number'] ?? ''));
-                if (strlen($serial) > 12) {
-                    $serial = substr($serial, 0, 12);
-                }
                 $hrn = preg_replace('/\D/', '', (string) ($v['hrn'] ?? ''));
 
-                // Serial valid if 12 digits
-                $serialStatus = strlen($serial) === 12 ? 'valid' : 'warning';
-                $hrnStatus = (strlen($hrn) >= 14 && strlen($hrn) <= 17) ? 'valid' : 'warning';
+                // Serial valid if between 12 and 20 digits (e.g. 12 or 15 digits)
+                $serialStatus = (strlen($serial) >= 12 && strlen($serial) <= 20) ? 'valid' : 'warning';
+                $hrnStatus = (strlen($hrn) >= 14 && strlen($hrn) <= 20) ? 'valid' : 'warning';
 
                 $formattedVouchers[] = [
                     'id' => 'v-ocr-'.uniqid().'-'.$idx,

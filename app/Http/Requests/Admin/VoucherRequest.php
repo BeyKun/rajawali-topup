@@ -22,9 +22,6 @@ class VoucherRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $serial = preg_replace('/\D/', '', (string) $this->input('serial_number'));
-        if (strlen($serial) > 12) {
-            $serial = substr($serial, 0, 12);
-        }
 
         $this->merge([
             'serial_number' => $serial,
@@ -40,8 +37,8 @@ class VoucherRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'serial_number' => ['required', 'string', 'digits:12', Rule::unique('vouchers', 'serial_number')],
-            'hrn' => ['required', 'string', 'digits:17'],
+            'serial_number' => ['required', 'string', 'digits_between:12,20', Rule::unique('vouchers', 'serial_number')],
+            'hrn' => ['required', 'string', 'digits_between:14,20'],
             'sell_price' => ['required', 'numeric', 'gt:0'],
             'margin_percentage' => ['nullable', 'numeric', 'min:0'],
             'city_ids' => ['nullable', 'array'],
@@ -58,10 +55,12 @@ class VoucherRequest extends FormRequest
     {
         return [
             'serial_number.required' => 'Serial number wajib diisi.',
-            'serial_number.digits' => 'Serial number harus terdiri dari 12 digit angka.',
+            'serial_number.digits' => 'Serial number harus terdiri dari 12 hingga 20 digit angka.',
+            'serial_number.digits_between' => 'Serial number harus terdiri dari 12 hingga 20 digit angka.',
             'serial_number.unique' => 'Voucher dengan nomor seri ini sudah pernah ditambahkan ke inventori.',
             'hrn.required' => 'HRN wajib diisi.',
-            'hrn.digits' => 'HRN harus terdiri dari 17 digit angka.',
+            'hrn.digits' => 'HRN harus terdiri dari 14 hingga 20 digit angka.',
+            'hrn.digits_between' => 'HRN harus terdiri dari 14 hingga 20 digit angka.',
             'sell_price.required' => 'Harga wajib diisi.',
             'sell_price.numeric' => 'Harga harus berupa angka.',
             'sell_price.gt' => 'Harga voucher tidak boleh 0 atau kurang.',

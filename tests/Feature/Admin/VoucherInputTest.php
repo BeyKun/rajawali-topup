@@ -70,6 +70,26 @@ test('a valid voucher is stored as available with an encrypted hrn and auto-crea
     expect($rawHrn)->not->toBe($hrn);
 });
 
+test('a valid 15-digit voucher is stored without truncation and preserves all digits', function () {
+    $serial = '500730332927269';
+    $hrn = '92225414690447797';
+
+    $this->actingAs($this->admin)
+        ->post('/admin/vouchers', [
+            'serial_number' => '5007 3033 2927 269',
+            'hrn' => '92225 41469 04477 97',
+            'sell_price' => 25000,
+        ])
+        ->assertRedirect('/admin/vouchers');
+
+    $voucher = Voucher::query()->where('serial_number', $serial)->sole();
+
+    expect($voucher->serial_number)->toBe('500730332927269')
+        ->and(strlen($voucher->serial_number))->toBe(15)
+        ->and($voucher->status)->toBe(VoucherStatus::Available)
+        ->and($voucher->hrn)->toBe($hrn);
+});
+
 test('two vouchers of the same package share one auto-generated product', function () {
     $pairs = [
         ['300338120354', '71125613431848001'],

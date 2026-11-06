@@ -351,9 +351,6 @@ class VoucherController extends Controller
 
             foreach ($rawRows as $row) {
                 $serial = (string) preg_replace('/\D/', '', trim((string) $row['serial_number']));
-                if (strlen($serial) > 12) {
-                    $serial = substr($serial, 0, 12);
-                }
                 $hrn = (string) preg_replace('/\s+/', '', trim((string) $row['hrn']));
                 $sellPrice = (float) $row['sell_price'];
 
@@ -482,9 +479,6 @@ class VoucherController extends Controller
             [$serial, $hrn, $sellPrice] = array_pad($line, 3, null);
 
             $serial = preg_replace('/\D/', '', trim((string) $serial));
-            if (strlen($serial) > 12) {
-                $serial = substr($serial, 0, 12);
-            }
             $hrn = preg_replace('/\s+/', '', trim((string) $hrn));
             $sellPrice = preg_replace('/[^0-9.]/', '', trim((string) $sellPrice)) ?? '';
 

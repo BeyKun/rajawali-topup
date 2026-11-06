@@ -223,9 +223,6 @@ async function startOcrScan(file: File): Promise<void> {
 
         scannedRows.value = serverResult.vouchers.map((r) => {
             let serial = cleanDigits(r.serial_number);
-            if (serial.length > 12) {
-                serial = serial.slice(0, 12);
-            }
             return {
                 ...r,
                 serial_number: formatSerialNumber(serial),
@@ -259,9 +256,6 @@ async function startOcrScan(file: File): Promise<void> {
 
             scannedRows.value = rows.map((r) => {
                 let serial = cleanDigits(r.serial_number);
-                if (serial.length > 12) {
-                    serial = serial.slice(0, 12);
-                }
                 return {
                     ...r,
                     serial_number: formatSerialNumber(serial),
@@ -304,9 +298,6 @@ function addManualRow(): void {
 function onSerialInput(row: ScannedVoucherRow, event: Event): void {
     handleFormattedInput(event, formatSerialNumber, (val) => {
         let clean = cleanDigits(val);
-        if (clean.length > 12) {
-            clean = clean.slice(0, 12);
-        }
         row.serial_number = formatSerialNumber(clean);
     });
 }
@@ -337,7 +328,7 @@ function clearAllScanned(): void {
 
 const validVouchersCount = computed(() => {
     return scannedRows.value.filter(
-        (r) => cleanDigits(r.serial_number).length === 12 && cleanDigits(r.hrn).length >= 14 && Number(r.sell_price || 0) > 0,
+        (r) => cleanDigits(r.serial_number).length >= 12 && cleanDigits(r.hrn).length >= 14 && Number(r.sell_price || 0) > 0,
     ).length;
 });
 
@@ -349,7 +340,7 @@ const isPhotoSubmitValid = computed(() => {
     return (
         scannedRows.value.length > 0 &&
         scannedRows.value.every(
-            (r) => cleanDigits(r.serial_number).length === 12 && cleanDigits(r.hrn) !== '' && Number(r.sell_price || 0) > 0,
+            (r) => cleanDigits(r.serial_number).length >= 12 && cleanDigits(r.hrn) !== '' && Number(r.sell_price || 0) > 0,
         )
     );
 });
@@ -378,9 +369,6 @@ function parseFriendlyError(errors: Record<string, any>): string {
 function submitPhotoRows(): void {
     const preparedRows = scannedRows.value.map((r) => {
         let serial = cleanDigits(r.serial_number);
-        if (serial.length > 12) {
-            serial = serial.slice(0, 12);
-        }
         return {
             serial_number: serial,
             hrn: cleanDigits(r.hrn),
@@ -711,17 +699,17 @@ function resetAndUploadMore(): void {
                                             <Input
                                                 :model-value="row.serial_number"
                                                 placeholder="Contoh: 3003 3812 0354"
-                                                maxlength="14"
+                                                maxlength="24"
                                                 class="h-8 font-mono text-xs"
                                                 @input="onSerialInput(row, $event)"
                                             />
                                             <div class="flex items-center gap-1.5 text-[10px]">
                                                 <span
-                                                    :class="cleanDigits(row.serial_number).length === 12
+                                                    :class="cleanDigits(row.serial_number).length >= 12
                                                         ? 'text-emerald-600 dark:text-emerald-400 font-medium'
                                                         : 'text-amber-600 dark:text-amber-400'"
                                                 >
-                                                    {{ cleanDigits(row.serial_number).length }}/12 digit
+                                                    {{ cleanDigits(row.serial_number).length }} digit
                                                 </span>
                                             </div>
                                         </div>

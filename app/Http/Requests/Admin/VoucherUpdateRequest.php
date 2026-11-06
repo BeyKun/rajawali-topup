@@ -24,9 +24,6 @@ class VoucherUpdateRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $serial = preg_replace('/\D/', '', (string) $this->input('serial_number'));
-        if (strlen($serial) > 12) {
-            $serial = substr($serial, 0, 12);
-        }
 
         $data = [
             'serial_number' => $serial,
@@ -54,10 +51,10 @@ class VoucherUpdateRequest extends FormRequest
             'serial_number' => [
                 'required',
                 'string',
-                'digits:12',
+                'digits_between:12,20',
                 Rule::unique('vouchers', 'serial_number')->ignore($voucherId),
             ],
-            'hrn' => ['nullable', 'string', 'digits:17'],
+            'hrn' => ['nullable', 'string', 'digits_between:14,20'],
             'status' => ['required', 'string', Rule::enum(VoucherStatus::class)],
             'sell_price' => ['required', 'numeric', 'gt:0'],
             'margin_percentage' => ['nullable', 'numeric', 'min:0'],
@@ -75,9 +72,11 @@ class VoucherUpdateRequest extends FormRequest
     {
         return [
             'serial_number.required' => 'Serial number wajib diisi.',
-            'serial_number.digits' => 'Serial number harus terdiri dari 12 digit angka.',
+            'serial_number.digits' => 'Serial number harus terdiri dari 12 hingga 20 digit angka.',
+            'serial_number.digits_between' => 'Serial number harus terdiri dari 12 hingga 20 digit angka.',
             'serial_number.unique' => 'Serial number ini sudah digunakan oleh voucher lain.',
-            'hrn.digits' => 'HRN harus terdiri dari 17 digit angka.',
+            'hrn.digits' => 'HRN harus terdiri dari 14 hingga 20 digit angka.',
+            'hrn.digits_between' => 'HRN harus terdiri dari 14 hingga 20 digit angka.',
             'status.required' => 'Status voucher wajib dipilih.',
             'status.enum' => 'Status voucher tidak valid.',
             'sell_price.required' => 'Harga wajib diisi.',

@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\ChangePasswordRequest;
 use App\Http\Requests\Api\UpdateOutletProfileRequest;
 use App\Models\OutletProfile;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 
 /**
  * Outlet profile endpoints for the mobile application.
@@ -92,5 +94,30 @@ class OutletProfileController extends Controller
             'village' => $profile->village?->name,
             'address' => $profile->address,
         ];
+    }
+
+    /**
+     * Change password for the currently authenticated outlet user.
+     */
+    public function changePassword(ChangePasswordRequest $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        if (! Hash::check((string) $request->validated('current_password'), (string) $user->password)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Password saat ini tidak sesuai.',
+            ], 422);
+        }
+
+        $user->forceFill([
+            'password' => Hash::make((string) $request->validated('new_password')),
+        ])->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Password berhasil diperbarui.',
+        ]);
     }
 }

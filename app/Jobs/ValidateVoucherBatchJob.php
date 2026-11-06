@@ -41,6 +41,11 @@ class ValidateVoucherBatchJob implements ShouldQueue
         $failed = 0;
 
         foreach ($this->rows as $index => $row) {
+            if ($index > 0) {
+                // Rate pacing: brief pause between successive Telkomsel API checks
+                usleep(250000);
+            }
+
             try {
                 $basePrice = (float) $row['sell_price'];
                 $sellPrice = $this->marginPercentage !== null && $this->marginPercentage > 0

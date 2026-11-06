@@ -25,6 +25,10 @@ Route::prefix('v1')->group(function (): void {
         ->middleware('throttle:10,1')
         ->name('api.v1.auth.login');
 
+    Route::post('auth/reset-password', [PhoneAuthController::class, 'resetPassword'])
+        ->middleware('throttle:5,1')
+        ->name('api.v1.auth.reset-password');
+
     // Deprecated: returns a 410 migration hint instead of a confusing 404.
     Route::post('auth/google', [GoogleAuthController::class, 'store'])
         ->middleware('throttle:10,1')
@@ -70,6 +74,9 @@ Route::prefix('v1')->group(function (): void {
 
         Route::put('profile', [OutletProfileController::class, 'update'])
             ->name('api.v1.profile.update');
+
+        Route::put('profile/password', [OutletProfileController::class, 'changePassword'])
+            ->name('api.v1.profile.password');
 
         Route::post('orders', [OrderController::class, 'store'])
             ->middleware('throttle:30,1')
