@@ -144,6 +144,27 @@ test('check voucher returns Gagal cek coba lagi on rate limit message in body', 
         ->and($result['status_message'])->toBe('Gagal cek coba lagi');
 });
 
+test('check voucher handles array message and error without array to string conversion', function () {
+    config(['telkomsel.mock' => false]);
+
+    Http::fake([
+        '*/check' => Http::response([
+            'statusCode' => -1,
+            'statusMessage' => ['Voucher Invalid dari array'],
+            'message' => ['Inner array message'],
+            'error' => ['code' => 500, 'message' => 'Nested error'],
+            'serialNumber' => ['300338120354'],
+        ], 200),
+    ]);
+
+    $result = app(TelkomselVoucherService::class)->checkVoucher('300338120354');
+
+    expect($result['is_valid'])->toBeFalse()
+        ->and($result['status_code'])->toBe(-1)
+        ->and($result['status_message'])->toBe('Voucher Invalid dari array')
+        ->and($result['serial_number'])->toBe('300338120354');
+});
+
 test('redeem voucher parses an already used code', function () {
     config(['telkomsel.mock' => false]);
 

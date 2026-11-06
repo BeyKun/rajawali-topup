@@ -59,11 +59,15 @@ class VoucherInventoryService
         $check = $this->telkomsel->checkVoucher($serialNumber);
 
         if (! $check['is_valid'] || $check['status_code'] !== self::CHECK_STATUS_AVAILABLE) {
+            $msg = is_string($check['status_message'])
+                ? $check['status_message']
+                : (is_array($check['status_message']) ? implode(' ', array_filter($check['status_message'], 'is_string')) : 'Invalid');
+
             throw ValidationException::withMessages([
                 'serial_number' => sprintf(
                     'Voucher tidak dapat ditambahkan: %s (kode %d).',
-                    $check['status_message'],
-                    $check['status_code'],
+                    $msg,
+                    (int) $check['status_code'],
                 ),
             ]);
         }

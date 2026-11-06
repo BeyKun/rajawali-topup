@@ -179,6 +179,44 @@ class TelkomselVoucherService
     }
 
     /**
+     * Safely extract a string from a scalar, array, or object to prevent
+     * PHP "Array to string conversion" errors.
+     */
+    protected function extractString(mixed $value, string $default = ''): string
+    {
+        if (is_string($value)) {
+            return trim($value);
+        }
+
+        if (is_numeric($value)) {
+            return (string) $value;
+        }
+
+        if (is_array($value)) {
+            if (isset($value['statusMessage']) && is_string($value['statusMessage'])) {
+                return trim($value['statusMessage']);
+            }
+            if (isset($value['message']) && is_string($value['message'])) {
+                return trim($value['message']);
+            }
+            if (isset($value['error']) && is_string($value['error'])) {
+                return trim($value['error']);
+            }
+
+            foreach ($value as $item) {
+                $extracted = $this->extractString($item);
+                if ($extracted !== '') {
+                    return $extracted;
+                }
+            }
+
+            return $default;
+        }
+
+        return $default;
+    }
+
+    /**
      * Build the normalized result from a raw /check response body.
      *
      * @param  array<array-key, mixed>  $data
@@ -186,7 +224,11 @@ class TelkomselVoucherService
      */
     protected function normalizeCheckResponse(array $data, string $serialNumber): array
     {
-        $rawMessage = (string) ($data['statusMessage'] ?? $data['message'] ?? $data['error'] ?? '');
+        $statusMsg = $this->extractString($data['statusMessage'] ?? null);
+        $message = $this->extractString($data['message'] ?? null);
+        $error = $this->extractString($data['error'] ?? null);
+
+        $rawMessage = $statusMsg !== '' ? $statusMsg : ($message !== '' ? $message : $error);
         $lowerMsg = strtolower($rawMessage);
 
         $isRateLimit = str_contains($lowerMsg, 'rate limit')
@@ -202,28 +244,32 @@ class TelkomselVoucherService
                 'is_valid' => false,
                 'status_code' => self::CHECK_STATUS_RATE_LIMIT,
                 'status_message' => 'Gagal cek coba lagi',
-                'serial_number' => (string) ($data['serialNumber'] ?? $serialNumber),
-                'name' => (string) ($data['name'] ?? ''),
-                'description' => (string) ($data['description'] ?? ''),
-                'validity' => (string) ($data['validity'] ?? ''),
-                'expired_date' => (string) ($data['expired_date'] ?? ''),
-                'region' => (string) ($data['region'] ?? ''),
+                'serial_number' => $this->extractString($data['serialNumber'] ?? null, $serialNumber),
+                'name' => $this->extractString($data['name'] ?? null),
+                'description' => $this->extractString($data['description'] ?? null),
+                'validity' => $this->extractString($data['validity'] ?? null),
+                'expired_date' => $this->extractString($data['expired_date'] ?? null),
+                'region' => $this->extractString($data['region'] ?? null),
                 'raw' => $data,
             ];
         }
 
         $statusCode = (int) ($data['statusCode'] ?? self::CHECK_STATUS_INVALID);
 
+        $finalStatusMessage = $statusMsg !== ''
+            ? $statusMsg
+            : ($rawMessage !== '' ? $rawMessage : (self::CHECK_STATUS_MESSAGES[$statusCode] ?? 'Unknown'));
+
         return [
             'is_valid' => $statusCode === self::CHECK_STATUS_AVAILABLE,
             'status_code' => $statusCode,
-            'status_message' => (string) ($data['statusMessage'] ?? self::CHECK_STATUS_MESSAGES[$statusCode] ?? 'Unknown'),
-            'serial_number' => (string) ($data['serialNumber'] ?? $serialNumber),
-            'name' => (string) ($data['name'] ?? ''),
-            'description' => (string) ($data['description'] ?? ''),
-            'validity' => (string) ($data['validity'] ?? ''),
-            'expired_date' => (string) ($data['expired_date'] ?? ''),
-            'region' => (string) ($data['region'] ?? ''),
+            'status_message' => $finalStatusMessage,
+            'serial_number' => $this->extractString($data['serialNumber'] ?? null, $serialNumber),
+            'name' => $this->extractString($data['name'] ?? null),
+            'description' => $this->extractString($data['description'] ?? null),
+            'validity' => $this->extractString($data['validity'] ?? null),
+            'expired_date' => $this->extractString($data['expired_date'] ?? null),
+            'region' => $this->extractString($data['region'] ?? null),
             'raw' => $data,
         ];
     }
@@ -237,16 +283,21 @@ class TelkomselVoucherService
     protected function normalizeRedeemResponse(array $data, bool $httpSuccessful): array
     {
         $inner = $this->toArray($data['data'] ?? null);
-        $code = (string) ($inner['code'] ?? $data['message'] ?? 'ERROR');
+        $code = $this->extractString($inner['code'] ?? $data['message'] ?? null, 'ERROR');
 
         $isSuccess = $httpSuccessful
             && ($data['status'] ?? false) === true
             && $code === '00';
 
+        $description = $this->extractString(
+            $inner['description'] ?? $data['error'] ?? null,
+            self::REDEEM_CODE_DESCRIPTIONS[$code] ?? 'Unknown error'
+        );
+
         return [
             'success' => $isSuccess,
             'code' => $code,
-            'description' => (string) ($inner['description'] ?? $data['error'] ?? self::REDEEM_CODE_DESCRIPTIONS[$code] ?? 'Unknown error'),
+            'description' => $description,
             'raw' => $data,
         ];
     }

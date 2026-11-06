@@ -355,12 +355,25 @@ class VoucherController extends Controller
             $rows = [];
 
             foreach ($rawRows as $row) {
-                $serial = (string) preg_replace('/\D/', '', trim((string) $row['serial_number']));
+                if (! is_array($row)) {
+                    continue;
+                }
+
+                $rawSerial = is_string($row['serial_number'] ?? null)
+                    ? $row['serial_number']
+                    : (is_array($row['serial_number'] ?? null) ? implode('', array_filter($row['serial_number'], 'is_string')) : '');
+
+                $serial = (string) preg_replace('/\D/', '', trim($rawSerial));
                 if (strlen($serial) > 12) {
                     $serial = substr($serial, 0, 12);
                 }
-                $hrn = (string) preg_replace('/\s+/', '', trim((string) $row['hrn']));
-                $sellPrice = (float) $row['sell_price'];
+
+                $rawHrn = is_string($row['hrn'] ?? null)
+                    ? $row['hrn']
+                    : (is_array($row['hrn'] ?? null) ? implode('', array_filter($row['hrn'], 'is_string')) : '');
+
+                $hrn = (string) preg_replace('/\s+/', '', trim($rawHrn));
+                $sellPrice = isset($row['sell_price']) && is_numeric($row['sell_price']) ? (float) $row['sell_price'] : 0.0;
 
                 if ($serial !== '' && $hrn !== '') {
                     if ($sellPrice <= 0) {

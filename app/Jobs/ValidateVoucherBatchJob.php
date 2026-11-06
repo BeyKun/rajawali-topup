@@ -153,16 +153,28 @@ class ValidateVoucherBatchJob implements ShouldQueue
     }
 
     /**
-     * Extract the first validation message from an exception.
+     * Extract the first validation message from an exception safely.
      */
     protected function firstError(ValidationException $exception): string
     {
-        /** @var array<string, array<int, string>> $errors */
+        /** @var array<string, mixed> $errors */
         $errors = $exception->errors();
 
         foreach ($errors as $messages) {
-            if ($messages !== []) {
-                return (string) $messages[0];
+            if (is_array($messages)) {
+                foreach ($messages as $msg) {
+                    if (is_string($msg)) {
+                        return trim($msg);
+                    }
+                    if (is_array($msg)) {
+                        $flat = implode(', ', array_filter($msg, 'is_string'));
+                        if ($flat !== '') {
+                            return $flat;
+                        }
+                    }
+                }
+            } elseif (is_string($messages)) {
+                return trim($messages);
             }
         }
 

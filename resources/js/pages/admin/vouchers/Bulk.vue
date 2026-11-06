@@ -392,15 +392,18 @@ async function checkSingleVoucher(row: ScannedVoucherRow): Promise<void> {
 
         if (!response.ok) {
             const errData = await response.json().catch(() => null);
+            const rawMsg = errData?.message || errData?.errors?.serial_number?.[0] || `HTTP ${response.status}`;
+            const msgStr = typeof rawMsg === 'string' ? rawMsg : (Array.isArray(rawMsg) ? rawMsg.join(' ') : JSON.stringify(rawMsg));
+
             const isRateLimit =
                 response.status === 429 ||
                 response.status === 403 ||
                 response.status === 503 ||
-                errData?.message?.toLowerCase().includes('rate limit') ||
-                errData?.message?.toLowerCase().includes('too many') ||
-                errData?.message?.toLowerCase().includes('coba lagi');
+                msgStr.toLowerCase().includes('rate limit') ||
+                msgStr.toLowerCase().includes('too many') ||
+                msgStr.toLowerCase().includes('coba lagi');
 
-            const msg = isRateLimit ? 'Gagal cek coba lagi' : errData?.message || errData?.errors?.serial_number?.[0] || `HTTP ${response.status}`;
+            const msg = isRateLimit ? 'Gagal cek coba lagi' : msgStr;
 
             row.check_result = {
                 is_valid: false,
@@ -496,18 +499,21 @@ async function checkAllVouchers(): Promise<void> {
 
             if (!response.ok) {
                 const errData = await response.json().catch(() => null);
+                const rawMsg = errData?.message || `HTTP ${response.status}`;
+                const msgStr = typeof rawMsg === 'string' ? rawMsg : (Array.isArray(rawMsg) ? rawMsg.join(' ') : JSON.stringify(rawMsg));
+
                 const isRateLimit =
                     response.status === 429 ||
                     response.status === 403 ||
                     response.status === 503 ||
-                    errData?.message?.toLowerCase().includes('rate limit') ||
-                    errData?.message?.toLowerCase().includes('too many') ||
-                    errData?.message?.toLowerCase().includes('coba lagi');
+                    msgStr.toLowerCase().includes('rate limit') ||
+                    msgStr.toLowerCase().includes('too many') ||
+                    msgStr.toLowerCase().includes('coba lagi');
 
                 row.check_result = {
                     is_valid: false,
                     status_code: isRateLimit ? 429 : -1,
-                    status_message: isRateLimit ? 'Gagal cek coba lagi' : errData?.message || `HTTP ${response.status}`,
+                    status_message: isRateLimit ? 'Gagal cek coba lagi' : msgStr,
                     serial_number: serial,
                 };
                 if (isRateLimit) {
@@ -685,12 +691,23 @@ async function pollBatchStatus(batchId: string): Promise<void> {
 
 function parseFriendlyError(errors: Record<string, any>): string {
     const messages: string[] = [];
+    if (!errors || typeof errors !== 'object') {
+        return 'Terjadi kesalahan validasi saat menyimpan data voucher.';
+    }
     for (const key of Object.keys(errors)) {
         const val = errors[key];
         if (typeof val === 'string') {
             messages.push(val);
         } else if (Array.isArray(val)) {
-            messages.push(val.join(' '));
+            val.forEach((item) => {
+                if (typeof item === 'string') {
+                    messages.push(item);
+                } else if (typeof item === 'object' && item !== null) {
+                    messages.push(JSON.stringify(item));
+                }
+            });
+        } else if (typeof val === 'object' && val !== null) {
+            messages.push(JSON.stringify(val));
         }
     }
     return messages.join('\n') || 'Terjadi kesalahan validasi saat menyimpan data voucher.';
