@@ -62,10 +62,23 @@ defineOptions({
     },
 });
 
+interface LatestBatchData {
+    id: string;
+    status: string;
+    total: number;
+    processed: number;
+    stored: number;
+    skipped: number;
+    failed: number;
+    errors: Array<{ row: number; serial_number: string; reason: string }>;
+    finished_at?: string;
+}
+
 const props = defineProps<{
     is_super_admin?: boolean;
     cities?: CityOption[];
     default_margin?: number;
+    latest_batch?: LatestBatchData | null;
 }>();
 
 const fixedMargin = computed(() => props.default_margin ?? 2);
@@ -368,7 +381,7 @@ async function checkSingleVoucher(row: ScannedVoucherRow): Promise<void> {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Accept': 'application/json',
+                Accept: 'application/json',
                 'X-CSRF-TOKEN': getCsrfToken(),
                 'X-XSRF-TOKEN': getCsrfToken(),
             },
@@ -379,33 +392,61 @@ async function checkSingleVoucher(row: ScannedVoucherRow): Promise<void> {
 
         if (!response.ok) {
             const errData = await response.json().catch(() => null);
-            const msg = errData?.message || (errData?.errors?.serial_number?.[0]) || `HTTP ${response.status}`;
+            const isRateLimit =
+                response.status === 429 ||
+                response.status === 403 ||
+                response.status === 503 ||
+                errData?.message?.toLowerCase().includes('rate limit') ||
+                errData?.message?.toLowerCase().includes('too many') ||
+                errData?.message?.toLowerCase().includes('coba lagi');
+
+            const msg = isRateLimit ? 'Gagal cek coba lagi' : errData?.message || errData?.errors?.serial_number?.[0] || `HTTP ${response.status}`;
+
             row.check_result = {
                 is_valid: false,
-                status_code: -1,
+                status_code: isRateLimit ? 429 : -1,
                 status_message: msg,
                 serial_number: serial,
             };
-            toast.error(`Pengecekan SN ${serial} gagal: ${msg}`);
+
+            if (isRateLimit) {
+                toast.warning(`SN ${serial}: Gagal cek coba lagi (Rate Limit)`);
+            } else {
+                toast.error(`Pengecekan SN ${serial} gagal: ${msg}`);
+            }
             return;
         }
 
         const data = await response.json();
+        const isRateLimit =
+            data.status_code === 429 ||
+            data.status_message?.toLowerCase().includes('rate limit') ||
+            data.status_message?.toLowerCase().includes('too many') ||
+            data.status_message?.toLowerCase().includes('coba lagi');
+
+        if (isRateLimit) {
+            data.status_code = 429;
+            data.status_message = 'Gagal cek coba lagi';
+            data.is_valid = false;
+        }
+
         row.check_result = data;
 
         if (data.is_valid) {
             toast.success(`SN ${serial}: Tersedia (${data.name || 'Paket Valid'})`);
+        } else if (isRateLimit) {
+            toast.warning(`SN ${serial}: Gagal cek coba lagi`);
         } else {
             toast.warning(`SN ${serial}: ${data.status_message} (kode ${data.status_code})`);
         }
     } catch (e: any) {
         row.check_result = {
             is_valid: false,
-            status_code: -1,
-            status_message: e?.message || 'Gagal koneksi',
+            status_code: 429,
+            status_message: 'Gagal cek coba lagi',
             serial_number: serial,
         };
-        toast.error(`Gagal menghubungi server untuk SN ${serial}`);
+        toast.warning(`SN ${serial}: Gagal cek coba lagi`);
     } finally {
         row.check_loading = false;
     }
@@ -419,6 +460,7 @@ async function checkAllVouchers(): Promise<void> {
     checkAllProgress.value = { current: 0, total: scannedRows.value.length };
 
     let availableCount = 0;
+    let rateLimitCount = 0;
     let invalidCount = 0;
 
     for (let i = 0; i < scannedRows.value.length; i++) {
@@ -443,7 +485,7 @@ async function checkAllVouchers(): Promise<void> {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Accept': 'application/json',
+                    Accept: 'application/json',
                     'X-CSRF-TOKEN': getCsrfToken(),
                     'X-XSRF-TOKEN': getCsrfToken(),
                 },
@@ -454,42 +496,69 @@ async function checkAllVouchers(): Promise<void> {
 
             if (!response.ok) {
                 const errData = await response.json().catch(() => null);
+                const isRateLimit =
+                    response.status === 429 ||
+                    response.status === 403 ||
+                    response.status === 503 ||
+                    errData?.message?.toLowerCase().includes('rate limit') ||
+                    errData?.message?.toLowerCase().includes('too many') ||
+                    errData?.message?.toLowerCase().includes('coba lagi');
+
                 row.check_result = {
                     is_valid: false,
-                    status_code: -1,
-                    status_message: errData?.message || `HTTP ${response.status}`,
+                    status_code: isRateLimit ? 429 : -1,
+                    status_message: isRateLimit ? 'Gagal cek coba lagi' : errData?.message || `HTTP ${response.status}`,
                     serial_number: serial,
                 };
-                invalidCount++;
+                if (isRateLimit) {
+                    rateLimitCount++;
+                } else {
+                    invalidCount++;
+                }
             } else {
                 const data = await response.json();
-                row.check_result = data;
-                if (data.is_valid) {
+                const isRateLimit =
+                    data.status_code === 429 ||
+                    data.status_message?.toLowerCase().includes('rate limit') ||
+                    data.status_message?.toLowerCase().includes('too many') ||
+                    data.status_message?.toLowerCase().includes('coba lagi');
+
+                if (isRateLimit) {
+                    data.status_code = 429;
+                    data.status_message = 'Gagal cek coba lagi';
+                    data.is_valid = false;
+                    rateLimitCount++;
+                } else if (data.is_valid) {
                     availableCount++;
                 } else {
                     invalidCount++;
                 }
+
+                row.check_result = data;
             }
         } catch {
             row.check_result = {
                 is_valid: false,
-                status_code: -1,
-                status_message: 'Koneksi error',
+                status_code: 429,
+                status_message: 'Gagal cek coba lagi',
                 serial_number: serial,
             };
-            invalidCount++;
+            rateLimitCount++;
         } finally {
             row.check_loading = false;
         }
 
-        // Delay 250ms antar-panggilan agar aman terhadap Telkomsel API
+        // Delay 2 detik antar-panggilan agar aman terhadap rate limit Telkomsel API
         if (i < scannedRows.value.length - 1) {
-            await new Promise((r) => setTimeout(r, 250));
+            await new Promise((r) => setTimeout(r, 2000));
         }
     }
 
     isCheckingAll.value = false;
-    toast.info(`Selesai mengecek: ${availableCount} Tersedia, ${invalidCount} Bermasalah.`);
+    let summaryMsg = `Selesai mengecek: ${availableCount} Tersedia`;
+    if (invalidCount > 0) summaryMsg += `, ${invalidCount} Ditolak`;
+    if (rateLimitCount > 0) summaryMsg += `, ${rateLimitCount} Gagal cek coba lagi`;
+    toast.info(summaryMsg);
 }
 
 const validVouchersCount = computed(() => {
@@ -519,6 +588,101 @@ const photoForm = useForm<{
     city_ids: [],
 });
 
+const submitBatchProgress = ref({
+    total: 0,
+    processed: 0,
+    stored: 0,
+    skipped: 0,
+    failed: 0,
+});
+const activeBatchId = ref<string | null>(null);
+let pollIntervalTimer: ReturnType<typeof setInterval> | null = null;
+
+function clearBatchPolling(): void {
+    if (pollIntervalTimer) {
+        clearInterval(pollIntervalTimer);
+        pollIntervalTimer = null;
+    }
+}
+
+async function pollBatchStatus(batchId: string): Promise<void> {
+    clearBatchPolling();
+
+    const checkStatus = async () => {
+        try {
+            const res = await fetch(`/admin/vouchers/batch/${batchId}`, {
+                headers: {
+                    Accept: 'application/json',
+                    'X-CSRF-TOKEN': getCsrfToken(),
+                },
+            });
+            if (!res.ok) return;
+
+            const data = await res.json();
+            submitBatchProgress.value = {
+                total: data.total || 0,
+                processed: data.processed || 0,
+                stored: data.stored || 0,
+                skipped: data.skipped || 0,
+                failed: data.failed || 0,
+            };
+
+            if (data.status === 'completed') {
+                clearBatchPolling();
+
+                const errors: Array<{ row: number; serial_number: string; reason: string }> = data.errors || [];
+                if (errors.length > 0) {
+                    submitStatus.value = 'error';
+
+                    const errList = errors.map((e) => `• No Seri ${cleanDigits(e.serial_number)}: ${e.reason}`).join('\n');
+                    if (data.stored === 0) {
+                        submitErrorMessage.value = `Semua voucher (${data.total}) gagal disimpan ke inventori:\n\n${errList}`;
+                    } else {
+                        submitErrorMessage.value = `${data.stored} voucher berhasil disimpan, namun ${errors.length} voucher ditolak Telkomsel:\n\n${errList}`;
+                    }
+
+                    // Buat map error per serial number
+                    const errorMap = new Map<string, string>();
+                    errors.forEach((e) => {
+                        errorMap.set(cleanDigits(e.serial_number), e.reason);
+                    });
+
+                    // Update baris tabel: hapus yang sukses, pertahankan yang gagal lengkap dengan status error
+                    scannedRows.value = scannedRows.value
+                        .filter((r) => errorMap.has(cleanDigits(r.serial_number)))
+                        .map((r) => {
+                            const serial = cleanDigits(r.serial_number);
+                            const reason = errorMap.get(serial) || 'Ditolak sistem';
+                            return {
+                                ...r,
+                                check_result: {
+                                    is_valid: false,
+                                    status_code: -1,
+                                    status_message: reason,
+                                    serial_number: serial,
+                                },
+                            };
+                        });
+
+                    toast.error(`Import selesai: ${data.stored} berhasil, ${errors.length} voucher bermasalah.`);
+                } else {
+                    submitStatus.value = 'success';
+                    submitSuccessCount.value = data.stored || data.total;
+                    clearAllScanned();
+                    toast.success(`Semua ${data.stored} voucher berhasil disimpan ke inventori.`);
+                }
+            }
+        } catch (err) {
+            console.error('Batch polling error:', err);
+        }
+    };
+
+    await checkStatus();
+    if (submitStatus.value === 'processing') {
+        pollIntervalTimer = setInterval(checkStatus, 800);
+    }
+}
+
 function parseFriendlyError(errors: Record<string, any>): string {
     const messages: string[] = [];
     for (const key of Object.keys(errors)) {
@@ -532,7 +696,7 @@ function parseFriendlyError(errors: Record<string, any>): string {
     return messages.join('\n') || 'Terjadi kesalahan validasi saat menyimpan data voucher.';
 }
 
-function submitPhotoRows(): void {
+async function submitPhotoRows(): Promise<void> {
     const preparedRows = scannedRows.value.map((r) => {
         let serial = cleanDigits(r.serial_number);
         if (serial.length > 12) {
@@ -553,33 +717,82 @@ function submitPhotoRows(): void {
         return;
     }
 
-    const invalidCheckedRows = scannedRows.value.filter((r) => r.check_result && !r.check_result.is_valid);
+    const rateLimitedRows = scannedRows.value.filter(
+        (r) => r.check_result && (r.check_result.status_code === 429 || r.check_result.status_message === 'Gagal cek coba lagi'),
+    );
+    const invalidCheckedRows = scannedRows.value.filter(
+        (r) =>
+            r.check_result &&
+            !r.check_result.is_valid &&
+            r.check_result.status_code !== 429 &&
+            r.check_result.status_message !== 'Gagal cek coba lagi',
+    );
+
     if (invalidCheckedRows.length > 0) {
         showSubmitModal.value = true;
         submitStatus.value = 'error';
-        const invalidSerials = invalidCheckedRows.map((r) => `• No Seri ${cleanDigits(r.serial_number)}: ${r.check_result?.status_message || 'Tidak Valid'}`).join('\n');
+        const invalidSerials = invalidCheckedRows
+            .map((r) => `• No Seri ${cleanDigits(r.serial_number)}: ${r.check_result?.status_message || 'Tidak Valid'}`)
+            .join('\n');
         submitErrorMessage.value = `Terdapat ${invalidCheckedRows.length} voucher yang sudah dicek dan berstatus tidak valid / sudah digunakan:\n${invalidSerials}\nSilakan hapus atau perbaiki nomor seri tersebut dari tabel sebelum melanjutkan import.`;
         return;
     }
 
-    photoForm.rows = preparedRows;
-    photoForm.city_ids = selectedCityIds.value;
+    if (rateLimitedRows.length > 0) {
+        showSubmitModal.value = true;
+        submitStatus.value = 'error';
+        const rateSerials = rateLimitedRows.map((r) => `• No Seri ${cleanDigits(r.serial_number)}: Gagal cek coba lagi`).join('\n');
+        submitErrorMessage.value = `Terdapat ${rateLimitedRows.length} voucher yang belum terkonfirmasi karena rate limit (Gagal cek coba lagi):\n${rateSerials}\nSilakan tunggu beberapa saat lalu klik tombol cek ulang pada voucher tersebut sebelum submit.`;
+        return;
+    }
 
     showSubmitModal.value = true;
     submitStatus.value = 'processing';
     submitErrorMessage.value = '';
-    submitSuccessCount.value = preparedRows.length;
+    submitSuccessCount.value = 0;
+    submitBatchProgress.value = {
+        total: preparedRows.length,
+        processed: 0,
+        stored: 0,
+        skipped: 0,
+        failed: 0,
+    };
 
-    photoForm.post('/admin/vouchers/bulk', {
-        preserveScroll: true,
-        onSuccess: () => {
-            submitStatus.value = 'success';
-        },
-        onError: (errors) => {
+    try {
+        const response = await fetch('/admin/vouchers/bulk', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': getCsrfToken(),
+                'X-XSRF-TOKEN': getCsrfToken(),
+            },
+            body: JSON.stringify({
+                rows: preparedRows,
+                city_ids: selectedCityIds.value,
+            }),
+        });
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => null);
             submitStatus.value = 'error';
-            submitErrorMessage.value = parseFriendlyError(errors);
-        },
-    });
+            submitErrorMessage.value = errData?.message || parseFriendlyError(errData?.errors || {}) || `HTTP ${response.status}`;
+            return;
+        }
+
+        const data = await response.json();
+        if (data.batch_id) {
+            activeBatchId.value = data.batch_id;
+            await pollBatchStatus(data.batch_id);
+        } else {
+            submitStatus.value = 'success';
+            submitSuccessCount.value = preparedRows.length;
+            clearAllScanned();
+        }
+    } catch (e: any) {
+        submitStatus.value = 'error';
+        submitErrorMessage.value = e?.message || 'Gagal mengirim data voucher ke server.';
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -598,38 +811,69 @@ function onCsvChange(event: Event): void {
     csvForm.file = target.files?.[0] ?? null;
 }
 
-function submitCsv(): void {
+async function submitCsv(): Promise<void> {
     if (!csvForm.file) {
         toast.error('Pilih berkas CSV terlebih dahulu.');
         return;
     }
 
-    csvForm.city_ids = selectedCityIds.value;
-
     showSubmitModal.value = true;
     submitStatus.value = 'processing';
     submitErrorMessage.value = '';
     submitSuccessCount.value = 0;
+    submitBatchProgress.value = {
+        total: 0,
+        processed: 0,
+        stored: 0,
+        skipped: 0,
+        failed: 0,
+    };
 
-    csvForm.post('/admin/vouchers/bulk', {
-        forceFormData: true,
-        preserveScroll: true,
-        onSuccess: () => {
-            submitStatus.value = 'success';
-        },
-        onError: (errors) => {
+    const formData = new FormData();
+    formData.append('file', csvForm.file);
+    selectedCityIds.value.forEach((id) => formData.append('city_ids[]', String(id)));
+
+    try {
+        const response = await fetch('/admin/vouchers/bulk', {
+            method: 'POST',
+            headers: {
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': getCsrfToken(),
+                'X-XSRF-TOKEN': getCsrfToken(),
+            },
+            body: formData,
+        });
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => null);
             submitStatus.value = 'error';
-            submitErrorMessage.value = parseFriendlyError(errors);
-        },
-    });
+            submitErrorMessage.value = errData?.message || parseFriendlyError(errData?.errors || {}) || `HTTP ${response.status}`;
+            return;
+        }
+
+        const data = await response.json();
+        if (data.batch_id) {
+            activeBatchId.value = data.batch_id;
+            await pollBatchStatus(data.batch_id);
+        } else {
+            submitStatus.value = 'success';
+            submitSuccessCount.value = data.count || 0;
+            csvForm.reset();
+        }
+    } catch (e: any) {
+        submitStatus.value = 'error';
+        submitErrorMessage.value = e?.message || 'Gagal mengunggah berkas CSV.';
+    }
 }
 
 function goToVoucherIndex(): void {
+    clearBatchPolling();
     showSubmitModal.value = false;
     router.visit('/admin/vouchers');
 }
 
 function resetAndUploadMore(): void {
+    clearBatchPolling();
     showSubmitModal.value = false;
     clearAllScanned();
     csvForm.reset();
@@ -649,6 +893,29 @@ function resetAndUploadMore(): void {
                 title="Bulk Import Voucher"
                 description="Scan fisik voucher langsung dari foto (deteksi No Seri & Kode Voucher otomatis) atau unggah file CSV."
             />
+        </div>
+
+        <!-- Alert Riwayat Batch Terakhir yang Memiliki Error -->
+        <div
+            v-if="props.latest_batch && props.latest_batch.errors && props.latest_batch.errors.length > 0"
+            class="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200"
+        >
+            <div class="flex items-start gap-2">
+                <AlertCircle class="size-4 text-amber-600 mt-0.5 shrink-0" />
+                <div class="flex-1 space-y-1">
+                    <div class="font-semibold">
+                        Pemberitahuan Import Terakhir: {{ props.latest_batch.stored }} Berhasil, {{ props.latest_batch.errors.length }} Gagal / Ditolak Telkomsel
+                    </div>
+                    <div class="text-[11px] text-muted-foreground">
+                        Beberapa voucher pada import terakhir tidak tersimpan karena ditolak Telkomsel atau invalid:
+                    </div>
+                    <div class="max-h-24 overflow-y-auto rounded border bg-background/50 p-2 font-mono text-[11px] whitespace-pre-wrap">
+                        <div v-for="err in props.latest_batch.errors" :key="err.serial_number">
+                            • No Seri {{ cleanDigits(err.serial_number) }}: {{ err.reason }}
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Mode Navigation Tabs -->
@@ -835,7 +1102,7 @@ function resetAndUploadMore(): void {
                             >
                                 <Loader2 v-if="isCheckingAll" class="size-3.5 animate-spin" />
                                 <ScanSearch v-else class="size-3.5" />
-                                <span v-if="isCheckingAll">Mengecek ({{ checkAllProgress.current }}/{{ checkAllProgress.total }})...</span>
+                                <span v-if="isCheckingAll">Mengecek ({{ checkAllProgress.current }}/{{ checkAllProgress.total }})... jeda 2s</span>
                                 <span v-else>Cek Semua Validitas</span>
                             </Button>
 
@@ -884,11 +1151,13 @@ function resetAndUploadMore(): void {
                                     :key="row.id"
                                     :class="[
                                         'transition-colors',
-                                        row.check_result && !row.check_result.is_valid
-                                            ? 'bg-rose-50/70 dark:bg-rose-950/20 hover:bg-rose-100/60 dark:hover:bg-rose-950/30'
-                                            : (row.check_result && row.check_result.is_valid
-                                                ? 'bg-emerald-50/40 dark:bg-emerald-950/10 hover:bg-emerald-50/70 dark:hover:bg-emerald-950/20'
-                                                : 'hover:bg-muted/20')
+                                        row.check_result && (row.check_result.status_code === 429 || row.check_result.status_message === 'Gagal cek coba lagi')
+                                            ? 'bg-amber-50/70 dark:bg-amber-950/20 hover:bg-amber-100/60 dark:hover:bg-amber-950/30'
+                                            : (row.check_result && !row.check_result.is_valid
+                                                ? 'bg-rose-50/70 dark:bg-rose-950/20 hover:bg-rose-100/60 dark:hover:bg-rose-950/30'
+                                                : (row.check_result && row.check_result.is_valid
+                                                    ? 'bg-emerald-50/40 dark:bg-emerald-950/10 hover:bg-emerald-50/70 dark:hover:bg-emerald-950/20'
+                                                    : 'hover:bg-muted/20'))
                                     ]"
                                 >
                                     <td class="py-2 px-3 font-mono text-muted-foreground">
@@ -983,6 +1252,12 @@ function resetAndUploadMore(): void {
                                                     class="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400"
                                                 >
                                                     <CheckCircle2 class="size-3.5" /> Tersedia
+                                                </span>
+                                                <span
+                                                    v-else-if="row.check_result.status_code === 429 || row.check_result.status_message === 'Gagal cek coba lagi'"
+                                                    class="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400"
+                                                >
+                                                    <AlertCircle class="size-3.5" /> Gagal cek coba lagi
                                                 </span>
                                                 <span
                                                     v-else-if="row.check_result.status_code === 3"
@@ -1268,7 +1543,7 @@ function resetAndUploadMore(): void {
     </Dialog>
 
     <!-- =================================================================== -->
-    <!-- MODAL 3: PROGRESS & HASIL UPLOAD VOUCHER (Poin 11 & Poin 1) -->
+    <!-- MODAL 3: PROGRESS & HASIL UPLOAD VOUCHER -->
     <!-- =================================================================== -->
     <Dialog :open="showSubmitModal">
         <DialogContent class="sm:max-w-md [&>button]:hidden">
@@ -1277,11 +1552,18 @@ function resetAndUploadMore(): void {
                 <div class="mx-auto flex size-14 items-center justify-center rounded-full bg-primary/10 text-primary">
                     <Loader2 class="size-8 animate-spin" />
                 </div>
-                <div class="space-y-1">
-                    <h3 class="text-base font-semibold">Memproses Import Voucher...</h3>
+                <div class="space-y-1.5">
+                    <h3 class="text-base font-semibold">Memproses Validasi Voucher...</h3>
                     <p class="text-xs text-muted-foreground max-w-sm mx-auto">
-                        Sistem sedang memvalidasi nomor seri, mendeteksi duplikasi, dan menyiapkan data ke dalam inventori.
+                        Sistem sedang memvalidasi status voucher ke Telkomsel dan menyimpan data yang valid ke inventori.
                     </p>
+                    <div v-if="submitBatchProgress.total > 0" class="pt-2 text-xs font-medium text-foreground">
+                        Memvalidasi: {{ submitBatchProgress.processed }} dari {{ submitBatchProgress.total }} voucher
+                        <div class="flex items-center justify-center gap-3 pt-1 text-[11px]">
+                            <span class="text-emerald-600 dark:text-emerald-400 font-semibold">✓ {{ submitBatchProgress.stored }} Tersedia</span>
+                            <span v-if="submitBatchProgress.skipped + submitBatchProgress.failed > 0" class="text-rose-600 dark:text-rose-400 font-semibold">✗ {{ submitBatchProgress.skipped + submitBatchProgress.failed }} Ditolak</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1291,9 +1573,9 @@ function resetAndUploadMore(): void {
                     <CheckCircle2 class="size-8" />
                 </div>
                 <div class="space-y-1.5">
-                    <h3 class="text-base font-semibold text-foreground">Import Voucher Berhasil Disubmit!</h3>
+                    <h3 class="text-base font-semibold text-foreground">Import Voucher Berhasil!</h3>
                     <p class="text-xs text-muted-foreground max-w-sm mx-auto">
-                        Data voucher telah berhasil dikirim ke antrean sistem dan akan diverifikasi ke Telkomsel di background.
+                        {{ submitSuccessCount }} voucher telah berhasil divalidasi ke Telkomsel dan tersimpan di inventori.
                     </p>
                 </div>
                 <div class="flex flex-col sm:flex-row items-center justify-center gap-2 pt-2">
@@ -1312,14 +1594,17 @@ function resetAndUploadMore(): void {
                     <AlertCircle class="size-8" />
                 </div>
                 <div class="space-y-2">
-                    <h3 class="text-base font-semibold text-destructive">Gagal Menyimpan Voucher</h3>
-                    <div class="max-h-48 overflow-y-auto rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-left text-xs leading-relaxed text-destructive/90 whitespace-pre-wrap">
+                    <h3 class="text-base font-semibold text-destructive">Voucher Bermasalah / Gagal Disimpan</h3>
+                    <p class="text-xs text-muted-foreground">
+                        Periksa rincian kegagalan berikut dari sistem/Telkomsel. Baris yang bermasalah tetap tersimpan di tabel untuk Anda perbaiki.
+                    </p>
+                    <div class="max-h-52 overflow-y-auto rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-left text-xs leading-relaxed text-destructive/90 whitespace-pre-wrap font-mono">
                         {{ submitErrorMessage }}
                     </div>
                 </div>
                 <div class="pt-2">
                     <Button variant="outline" class="w-full text-xs" @click="showSubmitModal = false">
-                        Tutup dan Perbaiki Data
+                        Tutup dan Perbaiki Data di Tabel
                     </Button>
                 </div>
             </div>

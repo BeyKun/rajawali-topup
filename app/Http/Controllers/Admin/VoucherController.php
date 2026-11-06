@@ -16,7 +16,9 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -285,17 +287,20 @@ class VoucherController extends Controller
                 ->all()
             : [];
 
+        $userId = $request->user()?->id;
+
         return Inertia::render('admin/vouchers/Bulk', [
             'is_super_admin' => $isSuperAdmin,
             'cities' => $cities,
             'default_margin' => (float) config('voucher.default_margin', 2.0),
+            'latest_batch' => $userId ? Cache::get("voucher_batch_latest_{$userId}") : null,
         ]);
     }
 
     /**
      * Parse an uploaded CSV and dispatch a background validation job.
      */
-    public function bulkStore(Request $request): RedirectResponse
+    public function bulkStore(Request $request): RedirectResponse|JsonResponse
     {
         $rules = [
             'file' => ['nullable', 'required_without:rows', 'file', 'mimes:csv,txt', 'max:5120'],
@@ -414,18 +419,75 @@ class VoucherController extends Controller
             ]);
         }
 
-        ValidateVoucherBatchJob::dispatch($rows, $request->user()?->id, $cityIds, $marginPercentage);
+        $batchId = (string) Str::uuid();
+
+        Cache::put("voucher_batch_{$batchId}", [
+            'id' => $batchId,
+            'status' => 'processing',
+            'total' => count($rows),
+            'processed' => 0,
+            'stored' => 0,
+            'skipped' => 0,
+            'failed' => 0,
+            'errors' => [],
+        ], now()->addHours(24));
+
+        ValidateVoucherBatchJob::dispatch($rows, $request->user()?->id, $cityIds, $marginPercentage, $batchId);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'batch_id' => $batchId,
+                'count' => count($rows),
+                'message' => sprintf('Import %d voucher sedang diproses.', count($rows)),
+            ]);
+        }
 
         Inertia::flash('toast', [
-            'type' => 'success',
-            'message' => sprintf('Import %d baris diproses di background. Cek daftar voucher untuk hasilnya.', count($rows)),
+            'type' => 'info',
+            'message' => sprintf('Import %d baris diproses di antrean. Validasi Telkomsel sedang berjalan...', count($rows)),
         ]);
 
-        return to_route('admin.vouchers.bulk')->with('bulk_result', [
-            'success' => true,
-            'count' => count($rows),
-            'message' => sprintf('Berhasil menambahkan %d voucher ke antrean inventori.', count($rows)),
-        ]);
+        return to_route('admin.vouchers.bulk')
+            ->with('bulk_batch_id', $batchId)
+            ->with('bulk_result', [
+                'success' => true,
+                'batch_id' => $batchId,
+                'count' => count($rows),
+                'message' => sprintf('Import %d voucher sedang divalidasi ke sistem Telkomsel.', count($rows)),
+            ]);
+    }
+
+    /**
+     * Check status and error report of a bulk voucher import batch.
+     */
+    public function batchStatus(string $batchId): JsonResponse
+    {
+        $batch = Cache::get("voucher_batch_{$batchId}");
+
+        if (! $batch) {
+            return response()->json([
+                'status' => 'not_found',
+                'message' => 'Batch tidak ditemukan atau sudah kedaluwarsa.',
+            ], 404);
+        }
+
+        return response()->json($batch);
+    }
+
+    /**
+     * Get the latest batch result for current logged in admin.
+     */
+    public function latestBatchStatus(Request $request): JsonResponse
+    {
+        $userId = $request->user()?->id;
+        $batch = $userId ? Cache::get("voucher_batch_latest_{$userId}") : null;
+
+        if (! $batch) {
+            return response()->json(['status' => 'none']);
+        }
+
+        return response()->json($batch);
     }
 
     /**

@@ -108,7 +108,40 @@ test('check voucher parses an invalid voucher response', function () {
     $result = app(TelkomselVoucherService::class)->checkVoucher('100338120354');
 
     expect($result['is_valid'])->toBeFalse()
-        ->and($result['status_code'])->toBe(-1);
+        ->and($result['status_code'])->toBe(-1)
+        ->and($result['status_message'])->toBe('Voucher Invalid');
+});
+
+test('check voucher returns Gagal cek coba lagi on HTTP 429 rate limit', function () {
+    config(['telkomsel.mock' => false]);
+
+    Http::fake([
+        '*/check' => Http::response(['message' => 'Too Many Requests'], 429),
+    ]);
+
+    $result = app(TelkomselVoucherService::class)->checkVoucher('300338120354');
+
+    expect($result['is_valid'])->toBeFalse()
+        ->and($result['status_code'])->toBe(429)
+        ->and($result['status_message'])->toBe('Gagal cek coba lagi');
+});
+
+test('check voucher returns Gagal cek coba lagi on rate limit message in body', function () {
+    config(['telkomsel.mock' => false]);
+
+    Http::fake([
+        '*/check' => Http::response([
+            'statusCode' => 429,
+            'statusMessage' => 'Silakan coba lagi beberapa saat',
+            'serialNumber' => '300338120354',
+        ], 200),
+    ]);
+
+    $result = app(TelkomselVoucherService::class)->checkVoucher('300338120354');
+
+    expect($result['is_valid'])->toBeFalse()
+        ->and($result['status_code'])->toBe(429)
+        ->and($result['status_message'])->toBe('Gagal cek coba lagi');
 });
 
 test('redeem voucher parses an already used code', function () {

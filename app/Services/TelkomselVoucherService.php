@@ -31,6 +31,9 @@ class TelkomselVoucherService
     /** /check statusCode: serial number is invalid. */
     private const CHECK_STATUS_INVALID = -1;
 
+    /** /check statusCode: rate limit or service temporary block. */
+    public const CHECK_STATUS_RATE_LIMIT = 429;
+
     /** Number of trailing characters kept when masking a secret value. */
     private const MASK_VISIBLE_CHARS = 4;
 
@@ -42,6 +45,7 @@ class TelkomselVoucherService
         self::CHECK_STATUS_AVAILABLE => 'Tersedia',
         self::CHECK_STATUS_USED => 'Sudah Digunakan',
         self::CHECK_STATUS_INVALID => 'Voucher Invalid',
+        self::CHECK_STATUS_RATE_LIMIT => 'Gagal cek coba lagi',
     ];
 
     /** Fallback descriptions for the Telkomsel /redeem `data.code` values. */
@@ -91,6 +95,22 @@ class TelkomselVoucherService
         $data = $this->toArray($response->json());
 
         $this->logApiCall('check', null, null, $payload, $response->status(), $data, $this->elapsedMs($startTime));
+
+        // Jika respons HTTP adalah 429 (Too Many Requests), 403 (Blocked/WAF), atau 503 (Overloaded)
+        if (in_array($response->status(), [429, 403, 503], true)) {
+            return [
+                'is_valid' => false,
+                'status_code' => self::CHECK_STATUS_RATE_LIMIT,
+                'status_message' => 'Gagal cek coba lagi',
+                'serial_number' => $serialNumber,
+                'name' => '',
+                'description' => '',
+                'validity' => '',
+                'expired_date' => '',
+                'region' => '',
+                'raw' => $data !== [] ? $data : ['status' => $response->status(), 'body' => $response->body()],
+            ];
+        }
 
         return $this->normalizeCheckResponse($data, $serialNumber);
     }
@@ -166,6 +186,32 @@ class TelkomselVoucherService
      */
     protected function normalizeCheckResponse(array $data, string $serialNumber): array
     {
+        $rawMessage = (string) ($data['statusMessage'] ?? $data['message'] ?? $data['error'] ?? '');
+        $lowerMsg = strtolower($rawMessage);
+
+        $isRateLimit = str_contains($lowerMsg, 'rate limit')
+            || str_contains($lowerMsg, 'too many request')
+            || str_contains($lowerMsg, 'coba lagi')
+            || str_contains($lowerMsg, 'try again')
+            || str_contains($lowerMsg, 'terlalu banyak')
+            || str_contains($lowerMsg, 'request limit')
+            || (int) ($data['statusCode'] ?? 0) === 429;
+
+        if ($isRateLimit) {
+            return [
+                'is_valid' => false,
+                'status_code' => self::CHECK_STATUS_RATE_LIMIT,
+                'status_message' => 'Gagal cek coba lagi',
+                'serial_number' => (string) ($data['serialNumber'] ?? $serialNumber),
+                'name' => (string) ($data['name'] ?? ''),
+                'description' => (string) ($data['description'] ?? ''),
+                'validity' => (string) ($data['validity'] ?? ''),
+                'expired_date' => (string) ($data['expired_date'] ?? ''),
+                'region' => (string) ($data['region'] ?? ''),
+                'raw' => $data,
+            ];
+        }
+
         $statusCode = (int) ($data['statusCode'] ?? self::CHECK_STATUS_INVALID);
 
         return [

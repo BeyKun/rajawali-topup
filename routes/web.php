@@ -49,6 +49,8 @@ Route::middleware(['auth', 'verified', 'admin'])
         Route::delete('vouchers/{voucher}', [VoucherController::class, 'destroy'])->name('vouchers.destroy');
         Route::get('vouchers/bulk', [VoucherController::class, 'bulk'])->name('vouchers.bulk');
         Route::post('vouchers/bulk', [VoucherController::class, 'bulkStore'])->name('vouchers.bulk.store');
+        Route::get('vouchers/batch/{batchId}', [VoucherController::class, 'batchStatus'])->name('vouchers.batch-status');
+        Route::get('vouchers/latest-batch', [VoucherController::class, 'latestBatchStatus'])->name('vouchers.latest-batch');
         Route::post('vouchers/scan-photo', [VoucherOcrController::class, 'scanPhoto'])->name('vouchers.scan-photo');
 
         Route::get('outlets', [OutletUserController::class, 'index'])->name('outlets.index');

@@ -8,7 +8,9 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
@@ -32,18 +34,36 @@ class ValidateVoucherBatchJob implements ShouldQueue
         public ?int $adminId = null,
         public array $cityIds = [],
         public ?float $marginPercentage = null,
-    ) {}
+        public ?string $batchId = null,
+    ) {
+        $this->batchId ??= (string) Str::uuid();
+    }
 
     public function handle(VoucherInventoryService $inventory): void
     {
         $stored = 0;
         $skipped = 0;
         $failed = 0;
+        $errors = [];
+
+        // Inisialisasi status batch di cache
+        Cache::put("voucher_batch_{$this->batchId}", [
+            'id' => $this->batchId,
+            'status' => 'processing',
+            'total' => count($this->rows),
+            'processed' => 0,
+            'stored' => 0,
+            'skipped' => 0,
+            'failed' => 0,
+            'errors' => [],
+        ], now()->addHours(24));
 
         foreach ($this->rows as $index => $row) {
             if ($index > 0) {
-                // Rate pacing: brief pause between successive Telkomsel API checks
-                usleep(250000);
+                // Rate pacing: jeda 2 detik antar-panggilan Telkomsel untuk mencegah rate limit
+                if (! app()->runningUnitTests()) {
+                    sleep(2);
+                }
             }
 
             try {
@@ -64,24 +84,67 @@ class ValidateVoucherBatchJob implements ShouldQueue
                 $stored++;
             } catch (ValidationException $exception) {
                 $skipped++;
+                $reason = $this->firstError($exception);
+                $errors[] = [
+                    'row' => $index + 1,
+                    'serial_number' => $row['serial_number'],
+                    'reason' => $reason,
+                ];
 
                 Log::info('Bulk voucher import skipped a row.', [
                     'row' => $index + 1,
                     'serial_number' => $row['serial_number'],
-                    'reason' => $this->firstError($exception),
+                    'reason' => $reason,
                 ]);
             } catch (Throwable $exception) {
                 $failed++;
+                $reason = $exception->getMessage();
+                $errors[] = [
+                    'row' => $index + 1,
+                    'serial_number' => $row['serial_number'],
+                    'reason' => $reason,
+                ];
 
                 Log::error('Bulk voucher import failed on a row.', [
                     'row' => $index + 1,
                     'serial_number' => $row['serial_number'],
-                    'error' => $exception->getMessage(),
+                    'error' => $reason,
                 ]);
             }
+
+            // Update progress ke cache setiap baris
+            Cache::put("voucher_batch_{$this->batchId}", [
+                'id' => $this->batchId,
+                'status' => 'processing',
+                'total' => count($this->rows),
+                'processed' => $index + 1,
+                'stored' => $stored,
+                'skipped' => $skipped,
+                'failed' => $failed,
+                'errors' => $errors,
+            ], now()->addHours(24));
+        }
+
+        $summary = [
+            'id' => $this->batchId,
+            'status' => 'completed',
+            'total' => count($this->rows),
+            'processed' => count($this->rows),
+            'stored' => $stored,
+            'skipped' => $skipped,
+            'failed' => $failed,
+            'errors' => $errors,
+            'finished_at' => now()->toIso8601String(),
+        ];
+
+        Cache::put("voucher_batch_{$this->batchId}", $summary, now()->addHours(24));
+
+        if ($this->adminId) {
+            Cache::put("voucher_batch_latest_{$this->adminId}", $summary, now()->addHours(24));
         }
 
         Log::info('Bulk voucher import finished.', [
+            'batch_id' => $this->batchId,
             'total' => count($this->rows),
             'stored' => $stored,
             'skipped' => $skipped,

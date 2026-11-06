@@ -37,6 +37,11 @@ class HandleInertiaRequests extends Middleware
     {
         return [
             ...parent::share($request),
+            'flash' => [
+                'toast' => fn () => $request->session()->get('toast'),
+                'bulk_batch_id' => fn () => $request->session()->get('bulk_batch_id'),
+                'bulk_result' => fn () => $request->session()->get('bulk_result'),
+            ],
             'name' => (config('app.name') && config('app.name') !== 'Laravel') ? config('app.name') : 'Rajawali Topup',
             'auth' => [
                 'user' => $request->user(),
