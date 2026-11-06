@@ -59,18 +59,33 @@ class ValidateVoucherBatchJob implements ShouldQueue
         ], now()->addHours(24));
 
         foreach ($this->rows as $index => $row) {
+            /*
+            // Di-comment out: Pengecekan rate limit Telkomsel saat upload bulk
             if ($index > 0) {
-                // Rate pacing: jeda 2 detik antar-panggilan Telkomsel untuk mencegah rate limit
                 if (! app()->runningUnitTests()) {
                     sleep(2);
                 }
             }
+            */
 
             try {
                 $basePrice = (float) $row['sell_price'];
                 $sellPrice = $this->marginPercentage !== null && $this->marginPercentage > 0
                     ? (float) round($basePrice * (1 + ($this->marginPercentage / 100)))
                     : $basePrice;
+
+                /*
+                // Di-comment out: Cek validasi voucher ke Telkomsel saat upload bulk
+                $inventory->addVoucher(
+                    $row['serial_number'],
+                    $row['hrn'],
+                    $sellPrice,
+                    $this->adminId,
+                    $this->cityIds,
+                    hppPrice: $basePrice,
+                    validateTelkomsel: true,
+                );
+                */
 
                 $inventory->addVoucher(
                     $row['serial_number'],
@@ -79,6 +94,7 @@ class ValidateVoucherBatchJob implements ShouldQueue
                     $this->adminId,
                     $this->cityIds,
                     hppPrice: $basePrice,
+                    validateTelkomsel: false,
                 );
 
                 $stored++;

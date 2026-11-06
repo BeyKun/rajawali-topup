@@ -183,6 +183,7 @@ class VoucherController extends Controller
                 $request->user()?->id,
                 $cityIds,
                 hppPrice: $basePrice,
+                validateTelkomsel: true,
             );
         } catch (ValidationException $exception) {
             return back()->withErrors($exception->errors())->withInput();

@@ -734,6 +734,8 @@ async function submitPhotoRows(): Promise<void> {
         return;
     }
 
+    /*
+    // Pengecekan validasi Telkomsel saat submit di-comment out
     const rateLimitedRows = scannedRows.value.filter(
         (r) => r.check_result && (r.check_result.status_code === 429 || r.check_result.status_message === 'Gagal cek coba lagi'),
     );
@@ -762,6 +764,7 @@ async function submitPhotoRows(): Promise<void> {
         submitErrorMessage.value = `Terdapat ${rateLimitedRows.length} voucher yang belum terkonfirmasi karena rate limit (Gagal cek coba lagi):\n${rateSerials}\nSilakan tunggu beberapa saat lalu klik tombol cek ulang pada voucher tersebut sebelum submit.`;
         return;
     }
+    */
 
     showSubmitModal.value = true;
     submitStatus.value = 'processing';
@@ -1109,6 +1112,8 @@ function resetAndUploadMore(): void {
 
                         <!-- Poin 8: Hilangkan button raw OCR. Poin 9: Tambahkan button Set Satu Harga. Poin 10: Ganti text Tambah Voucher Manual -->
                         <div class="flex items-center gap-2">
+                            <!-- Di-comment out: Pengecekan Cek Semua Validitas ke Telkomsel saat upload bulk -->
+                            <!--
                             <Button
                                 type="button"
                                 variant="outline"
@@ -1122,6 +1127,7 @@ function resetAndUploadMore(): void {
                                 <span v-if="isCheckingAll">Mengecek ({{ checkAllProgress.current }}/{{ checkAllProgress.total }})... jeda 2s</span>
                                 <span v-else>Cek Semua Validitas</span>
                             </Button>
+                            -->
 
                             <Button
                                 type="button"
@@ -1157,7 +1163,8 @@ function resetAndUploadMore(): void {
                                     <th class="py-2.5 px-3 font-medium min-w-[200px]">Kode Voucher (HRN)</th>
                                     <th class="py-2.5 px-3 font-medium min-w-[140px]">Harga Jual Dasar (Rp)</th>
                                     <th class="py-2.5 px-3 font-medium min-w-[140px]">Total (+{{ fixedMargin }}%)</th>
-                                    <th class="py-2.5 px-3 font-medium min-w-[160px]">Validasi Telkomsel</th>
+                                    <!-- Di-comment out: Kolom Validasi Telkomsel saat upload bulk -->
+                                    <!-- <th class="py-2.5 px-3 font-medium min-w-[160px]">Validasi Telkomsel</th> -->
                                     <th class="py-2.5 px-3 font-medium w-20">Format</th>
                                     <th class="py-2.5 px-3 font-medium w-12 text-center">Aksi</th>
                                 </tr>
@@ -1253,15 +1260,14 @@ function resetAndUploadMore(): void {
                                             {{ formatRupiah(Math.round(Number(row.sell_price || 0) * (1 + fixedMargin / 100))) }}
                                         </div>
                                     </td>
-                                    <!-- Tombol & Status Validasi Telkomsel -->
+                                    <!-- Di-comment out: Tombol & Status Validasi Telkomsel saat upload bulk -->
+                                    <!--
                                     <td class="py-2 px-3">
-                                        <!-- State 1: Sedang cek -->
                                         <div v-if="row.check_loading" class="flex items-center gap-1.5 text-xs text-muted-foreground">
                                             <Loader2 class="size-3.5 animate-spin text-sky-600 dark:text-sky-400" />
                                             <span>Mengecek...</span>
                                         </div>
 
-                                        <!-- State 2: Sudah ada hasil cek -->
                                         <div v-else-if="row.check_result" class="flex items-center justify-between gap-1">
                                             <div class="space-y-0.5">
                                                 <span
@@ -1311,7 +1317,6 @@ function resetAndUploadMore(): void {
                                             </Button>
                                         </div>
 
-                                        <!-- State 3: Belum dicek -> Tombol Cek Validitas -->
                                         <div v-else class="flex items-center gap-1.5">
                                             <Button
                                                 type="button"
@@ -1326,6 +1331,7 @@ function resetAndUploadMore(): void {
                                             </Button>
                                         </div>
                                     </td>
+                                    -->
                                     <!-- Format Status -->
                                     <td class="py-2 px-3">
                                         <span
@@ -1570,15 +1576,15 @@ function resetAndUploadMore(): void {
                     <Loader2 class="size-8 animate-spin" />
                 </div>
                 <div class="space-y-1.5">
-                    <h3 class="text-base font-semibold">Memproses Validasi Voucher...</h3>
+                    <h3 class="text-base font-semibold">Memproses Import Voucher...</h3>
                     <p class="text-xs text-muted-foreground max-w-sm mx-auto">
-                        Sistem sedang memvalidasi status voucher ke Telkomsel dan menyimpan data yang valid ke inventori.
+                        Sistem sedang menyimpan data voucher ke inventori.
                     </p>
                     <div v-if="submitBatchProgress.total > 0" class="pt-2 text-xs font-medium text-foreground">
-                        Memvalidasi: {{ submitBatchProgress.processed }} dari {{ submitBatchProgress.total }} voucher
+                        Menyimpan: {{ submitBatchProgress.processed }} dari {{ submitBatchProgress.total }} voucher
                         <div class="flex items-center justify-center gap-3 pt-1 text-[11px]">
-                            <span class="text-emerald-600 dark:text-emerald-400 font-semibold">✓ {{ submitBatchProgress.stored }} Tersedia</span>
-                            <span v-if="submitBatchProgress.skipped + submitBatchProgress.failed > 0" class="text-rose-600 dark:text-rose-400 font-semibold">✗ {{ submitBatchProgress.skipped + submitBatchProgress.failed }} Ditolak</span>
+                            <span class="text-emerald-600 dark:text-emerald-400 font-semibold">✓ {{ submitBatchProgress.stored }} Disimpan</span>
+                            <span v-if="submitBatchProgress.skipped + submitBatchProgress.failed > 0" class="text-rose-600 dark:text-rose-400 font-semibold">✗ {{ submitBatchProgress.skipped + submitBatchProgress.failed }} Gagal</span>
                         </div>
                     </div>
                 </div>
@@ -1592,7 +1598,7 @@ function resetAndUploadMore(): void {
                 <div class="space-y-1.5">
                     <h3 class="text-base font-semibold text-foreground">Import Voucher Berhasil!</h3>
                     <p class="text-xs text-muted-foreground max-w-sm mx-auto">
-                        {{ submitSuccessCount }} voucher telah berhasil divalidasi ke Telkomsel dan tersimpan di inventori.
+                        {{ submitSuccessCount }} voucher telah berhasil disimpan ke inventori.
                     </p>
                 </div>
                 <div class="flex flex-col sm:flex-row items-center justify-center gap-2 pt-2">

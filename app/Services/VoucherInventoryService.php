@@ -46,6 +46,7 @@ class VoucherInventoryService
         ?int $adminId = null,
         array $cityIds = [],
         ?float $hppPrice = null,
+        bool $validateTelkomsel = true,
     ): Voucher {
         $serialNumber = trim($serialNumber);
         $hrn = trim($hrn);
@@ -56,6 +57,8 @@ class VoucherInventoryService
             ]);
         }
 
+        /*
+        // Cek validasi voucher ke Telkomsel ketika upload bulk (di-comment out)
         $check = $this->telkomsel->checkVoucher($serialNumber);
 
         if (! $check['is_valid'] || $check['status_code'] !== self::CHECK_STATUS_AVAILABLE) {
@@ -70,6 +73,39 @@ class VoucherInventoryService
                     (int) $check['status_code'],
                 ),
             ]);
+        }
+        */
+
+        if ($validateTelkomsel) {
+            $check = $this->telkomsel->checkVoucher($serialNumber);
+
+            if (! $check['is_valid'] || $check['status_code'] !== self::CHECK_STATUS_AVAILABLE) {
+                $msg = is_string($check['status_message'])
+                    ? $check['status_message']
+                    : (is_array($check['status_message']) ? implode(' ', array_filter($check['status_message'], 'is_string')) : 'Invalid');
+
+                throw ValidationException::withMessages([
+                    'serial_number' => sprintf(
+                        'Voucher tidak dapat ditambahkan: %s (kode %d).',
+                        $msg,
+                        (int) $check['status_code'],
+                    ),
+                ]);
+            }
+        } else {
+            // Default voucher package metadata saat cek Telkomsel di-bypass pada bulk upload
+            $check = [
+                'is_valid' => true,
+                'status_code' => 1,
+                'status_message' => 'Tersedia',
+                'serial_number' => $serialNumber,
+                'name' => 'Voucher Fisik Telkomsel',
+                'description' => 'Voucher Fisik Telkomsel',
+                'validity' => '',
+                'expired_date' => '',
+                'region' => '',
+                'raw' => [],
+            ];
         }
 
         return DB::transaction(function () use ($check, $serialNumber, $hrn, $sellPrice, $adminId, $cityIds, $hppPrice): Voucher {
