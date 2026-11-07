@@ -26,6 +26,8 @@ export type AdminVoucher = {
     id: number;
     serial_number: string;
     product_name: string | null;
+    title?: string | null;
+    description?: string | null;
     sell_price: number | null;
     hpp_price?: number | null;
     margin_percentage?: number | null;
@@ -71,6 +73,14 @@ export type AdminProductRow = {
     available_stock: number;
     reserved_stock: number;
     total_stock: number;
+};
+
+export type ProductCatalogOption = {
+    id: number;
+    name: string;
+    quota_description: string;
+    sell_price?: number;
+    hpp_price?: number;
 };
 
 export type AdminProductSummary = {

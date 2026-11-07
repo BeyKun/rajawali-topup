@@ -1,11 +1,21 @@
 <script setup lang="ts">
 import { router } from '@inertiajs/vue3';
-import { Package, Search, X } from '@lucide/vue';
+import { Package, Search, Trash2, X } from '@lucide/vue';
 import { reactive } from 'vue';
 import Heading from '@/components/Heading.vue';
 import Pagination from '@/components/admin/Pagination.vue';
 import StatusBadge from '@/components/admin/StatusBadge.vue';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -71,6 +81,10 @@ function stockClass(stock: number): string {
     }
 
     return 'text-foreground';
+}
+
+function destroy(product: AdminProductRow): void {
+    router.delete(`/admin/products/${product.id}`, { preserveScroll: true });
 }
 </script>
 
@@ -158,6 +172,7 @@ function stockClass(stock: number): string {
                         <th class="px-4 py-3 font-medium">Harga Jual</th>
                         <th class="px-4 py-3 font-medium">Stok Tersedia</th>
                         <th class="px-4 py-3 font-medium">Status</th>
+                        <th class="px-4 py-3 text-right font-medium">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -198,10 +213,54 @@ function stockClass(stock: number): string {
                                 :status="product.is_active ? 'ACTIVE' : 'INACTIVE'"
                             />
                         </td>
+                        <td class="px-4 py-3 text-right">
+                            <Dialog v-if="product.available_stock === 0">
+                                <DialogTrigger as-child>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon-sm"
+                                        aria-label="Hapus Paket"
+                                        class="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                    >
+                                        <Trash2 class="size-4" />
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                    <DialogHeader>
+                                        <DialogTitle>
+                                            Hapus Katalog Paket?
+                                        </DialogTitle>
+                                        <DialogDescription>
+                                            Katalog {{ product.name }} akan dihapus. Jika sudah ada riwayat transaksi, katalog akan diarsipkan.
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <DialogFooter>
+                                        <DialogClose as-child>
+                                            <Button variant="outline">
+                                                Batal
+                                            </Button>
+                                        </DialogClose>
+                                        <Button
+                                            variant="destructive"
+                                            @click="destroy(product)"
+                                        >
+                                            Hapus
+                                        </Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+                            <span
+                                v-else
+                                class="text-xs text-muted-foreground"
+                                title="Paket dengan stok aktif tidak dapat dihapus"
+                            >
+                                -
+                            </span>
+                        </td>
                     </tr>
                     <tr v-if="props.products.data.length === 0">
                         <td
-                            colspan="7"
+                            colspan="8"
                             class="px-4 py-12 text-center text-muted-foreground"
                         >
                             <Package class="mx-auto mb-2 size-8 opacity-40" />

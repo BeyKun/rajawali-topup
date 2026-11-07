@@ -57,6 +57,8 @@ class VoucherUpdateRequest extends FormRequest
                 'digits:12',
                 Rule::unique('vouchers', 'serial_number')->ignore($voucherId),
             ],
+            'title' => ['nullable', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:1000'],
             'hrn' => ['nullable', 'string', 'digits_between:14,20'],
             'status' => ['required', 'string', Rule::enum(VoucherStatus::class)],
             'sell_price' => ['required', 'numeric', 'gt:0'],

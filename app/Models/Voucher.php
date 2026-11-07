@@ -55,9 +55,16 @@ class Voucher extends Model
         ];
     }
 
+    public function resolveRouteBinding($value, $field = null): ?Model
+    {
+        return $this->where('serial_number', (string) $value)
+            ->orWhere('id', $value)
+            ->first();
+    }
+
     public function product(): BelongsTo
     {
-        return $this->belongsTo(Product::class);
+        return $this->belongsTo(Product::class)->withTrashed();
     }
 
     public function createdBy(): BelongsTo

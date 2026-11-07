@@ -105,3 +105,33 @@ test('voucher index never exposes the hrn', function () {
             ->missing('vouchers.data.0.hrn')
         );
 });
+
+test('voucher index includes title and description', function () {
+    $this->product->update([
+        'name' => 'Telkomsel 14GB 30 Hari',
+        'quota_description' => '14 GB Kuota Nasional 30 Hari',
+    ]);
+    Voucher::factory()->create([
+        'product_id' => $this->product->id,
+        'serial_number' => '300338120354',
+    ]);
+
+    $this->actingAs($this->admin)
+        ->get('/admin/vouchers')
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('vouchers.data.0.title', 'Telkomsel 14GB 30 Hari')
+            ->where('vouchers.data.0.description', '14 GB Kuota Nasional 30 Hari')
+        );
+});
+
+test('voucher index includes products list for catalog dropdown', function () {
+    $this->actingAs($this->admin)
+        ->get('/admin/vouchers')
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->has('products')
+            ->where('products.0.name', $this->product->name)
+            ->where('products.0.quota_description', $this->product->quota_description)
+        );
+});

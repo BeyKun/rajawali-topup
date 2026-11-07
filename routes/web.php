@@ -40,6 +40,7 @@ Route::middleware(['auth', 'verified', 'admin'])
 
         Route::get('products', [ProductController::class, 'index'])->name('products.index');
         Route::put('products/{product}', [ProductController::class, 'update'])->name('products.update');
+        Route::delete('products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
 
         Route::get('vouchers', [VoucherController::class, 'index'])->name('vouchers.index');
         Route::get('vouchers/create', [VoucherController::class, 'create'])->name('vouchers.create');

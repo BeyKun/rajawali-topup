@@ -180,7 +180,7 @@ class VoucherInventoryService
      *
      * @param  array{name: string, description: string, validity: string, region: string}  $check
      */
-    protected function resolveProduct(
+    public function resolveProduct(
         array $check,
         ?float $sellPrice,
         ?int $cityId = null,

@@ -2,7 +2,9 @@
 import { router, useForm, useHttp } from '@inertiajs/vue3';
 import {
     AlertTriangle,
+    Check,
     CheckCircle2,
+    ChevronDown,
     FileUp,
     Pencil,
     Plus,
@@ -11,7 +13,8 @@ import {
     Trash2,
     X,
 } from '@lucide/vue';
-import { computed, reactive, ref } from 'vue';
+import { onClickOutside } from '@vueuse/core';
+import { computed, nextTick, reactive, ref } from 'vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import SearchableCityMultiSelect, {
@@ -50,6 +53,7 @@ import {
 import type {
     AdminVoucher,
     Paginator,
+    ProductCatalogOption,
     VoucherCheckResult,
     VoucherStatus,
 } from '@/types';
@@ -72,6 +76,7 @@ const props = defineProps<{
     statusCounts: Record<VoucherStatus, number>;
     is_super_admin?: boolean;
     cities?: CityOption[];
+    products?: ProductCatalogOption[];
 }>();
 
 const statusOptions: VoucherStatus[] = [
@@ -110,8 +115,75 @@ function destroy(voucher: AdminVoucher): void {
 
 const editingVoucher = ref<AdminVoucher | null>(null);
 const showEditDialog = ref(false);
+const selectedProductOption = ref('manual');
+const isProductSelectOpen = ref(false);
+const productSelectRef = ref<HTMLElement | null>(null);
+const productSearchInputRef = ref<HTMLInputElement | null>(null);
+const productSearchQuery = ref('');
+
+onClickOutside(productSelectRef, () => {
+    isProductSelectOpen.value = false;
+});
+
+function toggleProductSelect(): void {
+    isProductSelectOpen.value = !isProductSelectOpen.value;
+    if (isProductSelectOpen.value) {
+        productSearchQuery.value = '';
+        nextTick(() => {
+            productSearchInputRef.value?.focus();
+        });
+    }
+}
+
+function onProductOptionChange(val: string): void {
+    selectedProductOption.value = val;
+    if (val !== 'manual') {
+        const product = props.products?.find((p) => String(p.id) === val);
+        if (product) {
+            editForm.title = product.name;
+            editForm.description = product.quota_description;
+        }
+    }
+}
+
+function selectProductOption(val: string): void {
+    onProductOptionChange(val);
+    isProductSelectOpen.value = false;
+}
+
+function formatProductLabel(product: ProductCatalogOption): string {
+    const desc = product.quota_description ? ` — ${product.quota_description}` : '';
+    const full = `${product.name}${desc}`;
+    return full.length > 55 ? `${full.slice(0, 52)}...` : full;
+}
+
+const filteredProducts = computed(() => {
+    const q = productSearchQuery.value.trim().toLowerCase();
+    if (!q) {
+        return props.products || [];
+    }
+    return (props.products || []).filter((p) => {
+        return (
+            p.name.toLowerCase().includes(q) ||
+            (p.quota_description || '').toLowerCase().includes(q)
+        );
+    });
+});
+
+const selectedProductDisplayLabel = computed(() => {
+    if (selectedProductOption.value === 'manual') {
+        return 'Edit Manual';
+    }
+    const product = props.products?.find((p) => String(p.id) === selectedProductOption.value);
+    if (product) {
+        return formatProductLabel(product);
+    }
+    return 'Pilih Paket atau Edit Manual';
+});
 
 const editForm = useForm({
+    title: '',
+    description: '',
     serial_number: '',
     hrn: '',
     sell_price: '',
@@ -126,6 +198,22 @@ function openEdit(voucher: AdminVoucher): void {
     }
     editingVoucher.value = voucher;
     editForm.clearErrors();
+    isProductSelectOpen.value = false;
+    productSearchQuery.value = '';
+    const currentTitle = voucher.title ?? voucher.product_name ?? '';
+    const currentDesc = voucher.description ?? '';
+    editForm.title = currentTitle;
+    editForm.description = currentDesc;
+
+    const matchedProduct = props.products?.find(
+        (p) => p.name === currentTitle && p.quota_description === currentDesc,
+    );
+    if (matchedProduct) {
+        selectedProductOption.value = String(matchedProduct.id);
+    } else {
+        selectedProductOption.value = 'manual';
+    }
+
     editForm.serial_number = formatSerialNumber(voucher.serial_number);
     editForm.hrn = '';
     editForm.sell_price = voucher.hpp_price != null ? String(voucher.hpp_price) : (voucher.sell_price != null ? String(voucher.sell_price) : '');
@@ -199,6 +287,13 @@ async function checkSerial(): Promise<void> {
 
         if (!result.is_valid) {
             checkError.value = result.status_message;
+        } else {
+            if (!editForm.title && result.name) {
+                editForm.title = result.name;
+            }
+            if (!editForm.description && result.description) {
+                editForm.description = result.description;
+            }
         }
     } catch {
         checkError.value = 'Gagal menghubungi server. Silakan coba lagi.';
@@ -216,9 +311,11 @@ function submitEdit(): void {
 
     editForm.transform((data) => ({
         ...data,
+        title: data.title ? data.title.trim() : '',
+        description: data.description ? data.description.trim() : '',
         serial_number: cleanDigits(data.serial_number),
         hrn: cleanDigits(data.hrn),
-    })).put(`/admin/vouchers/${editingVoucher.value.id}`, {
+    })).put(`/admin/vouchers/${editingVoucher.value.serial_number}`, {
         preserveScroll: true,
         onSuccess: () => {
             showEditDialog.value = false;
@@ -319,7 +416,7 @@ function submitEdit(): void {
                 <thead class="bg-muted/50 text-left">
                     <tr>
                         <th class="px-4 py-3 font-medium">Serial Number</th>
-                        <th class="px-4 py-3 font-medium">Paket</th>
+                        <th class="px-4 py-3 font-medium">Judul & Deskripsi</th>
                         <th class="px-4 py-3 font-medium">Harga Jual</th>
                         <th class="px-4 py-3 font-medium">Status</th>
                         <th class="px-4 py-3 font-medium">Region</th>
@@ -339,7 +436,16 @@ function submitEdit(): void {
                             {{ formatSerialNumber(voucher.serial_number) }}
                         </td>
                         <td class="px-4 py-3">
-                            {{ voucher.product_name ?? '-' }}
+                            <div class="font-medium text-foreground">
+                                {{ voucher.title || voucher.product_name || '-' }}
+                            </div>
+                            <div
+                                v-if="voucher.description"
+                                class="text-xs text-muted-foreground line-clamp-2 max-w-xs"
+                                :title="voucher.description"
+                            >
+                                {{ voucher.description }}
+                            </div>
                         </td>
                         <td class="px-4 py-3">
                             {{
@@ -440,17 +546,165 @@ function submitEdit(): void {
 
         <!-- Dialog Edit Voucher -->
         <Dialog v-model:open="showEditDialog">
-            <DialogContent class="max-w-xl">
+            <DialogContent class="max-w-xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>
                         Edit Voucher
                     </DialogTitle>
                     <DialogDescription>
-                        Perbarui detail voucher, harga jual, wilayah, atau status.
+                        Perbarui detail voucher, judul, deskripsi, harga jual, wilayah, atau status.
                     </DialogDescription>
                 </DialogHeader>
 
                 <form class="space-y-4" @submit.prevent="submitEdit">
+                    <!-- Searchable Dropdown Pilihan Paket / Edit Manual -->
+                    <div class="grid gap-2">
+                        <Label for="edit_product_select">Katalog Paket (Judul & Deskripsi)</Label>
+                        <div ref="productSelectRef" class="relative">
+                            <button
+                                type="button"
+                                id="edit_product_select"
+                                class="border-input focus-visible:border-ring focus-visible:ring-ring/50 flex h-9 w-full min-w-0 items-center justify-between gap-2 rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs transition-colors focus-visible:ring-[3px] focus-visible:outline-none"
+                                @click="toggleProductSelect"
+                            >
+                                <span
+                                    v-if="selectedProductOption === 'manual'"
+                                    class="flex min-w-0 items-center gap-2 font-medium text-primary"
+                                >
+                                    <Pencil class="size-4 shrink-0" />
+                                    <span class="truncate">Edit Manual</span>
+                                </span>
+                                <span
+                                    v-else
+                                    class="min-w-0 truncate text-left"
+                                    :class="{ 'text-muted-foreground': !selectedProductOption }"
+                                    :title="editForm.title ? `${editForm.title} — ${editForm.description}` : ''"
+                                >
+                                    {{ selectedProductDisplayLabel }}
+                                </span>
+                                <ChevronDown
+                                    class="size-4 shrink-0 opacity-50 transition-transform"
+                                    :class="{ 'rotate-180': isProductSelectOpen }"
+                                />
+                            </button>
+
+                            <!-- Dropdown Menu / Popover -->
+                            <div
+                                v-if="isProductSelectOpen"
+                                class="bg-popover text-popover-foreground absolute z-50 mt-1 max-h-72 w-full rounded-md border shadow-md outline-none animate-in fade-in-0 zoom-in-95"
+                            >
+                                <!-- Search Input -->
+                                <div class="border-b p-2">
+                                    <div class="relative flex items-center">
+                                        <Search class="text-muted-foreground absolute left-2.5 size-4" />
+                                        <input
+                                            ref="productSearchInputRef"
+                                            v-model="productSearchQuery"
+                                            type="text"
+                                            placeholder="Cari nama paket atau kuota..."
+                                            class="border-input bg-background focus:ring-ring h-8 w-full rounded-md border pl-8 pr-7 text-xs focus:ring-1 focus:outline-none"
+                                        />
+                                        <button
+                                            v-if="productSearchQuery"
+                                            type="button"
+                                            class="text-muted-foreground hover:text-foreground absolute right-2"
+                                            @click="productSearchQuery = ''"
+                                        >
+                                            <X class="size-3.5" />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Options List -->
+                                <div class="max-h-56 overflow-y-auto p-1 text-sm">
+                                    <!-- Option: Edit Manual (dengan Lucide icon Pencil) -->
+                                    <button
+                                        type="button"
+                                        class="hover:bg-accent hover:text-accent-foreground flex w-full cursor-pointer items-center justify-between gap-2 rounded-sm px-2.5 py-1.5 text-left text-sm font-medium text-primary"
+                                        @click="selectProductOption('manual')"
+                                    >
+                                        <div class="flex items-center gap-2">
+                                            <Pencil class="size-4 shrink-0 text-primary" />
+                                            <span>Edit Manual</span>
+                                        </div>
+                                        <Check
+                                            v-if="selectedProductOption === 'manual'"
+                                            class="size-4 shrink-0 text-primary"
+                                        />
+                                    </button>
+
+                                    <div class="my-1 border-t"></div>
+
+                                    <!-- List of filtered products -->
+                                    <div
+                                        v-if="filteredProducts.length === 0"
+                                        class="py-4 text-center text-xs text-muted-foreground"
+                                    >
+                                        Tidak ada paket yang cocok dengan "{{ productSearchQuery }}"
+                                    </div>
+                                    <button
+                                        v-for="product in filteredProducts"
+                                        :key="product.id"
+                                        type="button"
+                                        class="hover:bg-accent hover:text-accent-foreground flex w-full min-w-0 cursor-pointer items-center justify-between gap-2 rounded-sm px-2.5 py-1.5 text-left text-sm"
+                                        :title="`${product.name} — ${product.quota_description}`"
+                                        @click="selectProductOption(String(product.id))"
+                                    >
+                                        <span class="min-w-0 flex-1 truncate">
+                                            {{ formatProductLabel(product) }}
+                                        </span>
+                                        <Check
+                                            v-if="selectedProductOption === String(product.id)"
+                                            class="size-4 shrink-0 text-primary"
+                                        />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Input manual judul & deskripsi: hanya muncul jika 'Edit Manual' dipilih -->
+                    <div
+                        v-if="selectedProductOption === 'manual'"
+                        class="space-y-4 rounded-lg border bg-muted/20 p-3.5"
+                    >
+                        <div class="grid gap-2">
+                            <Label for="edit_title">Judul Voucher</Label>
+                            <Input
+                                id="edit_title"
+                                v-model="editForm.title"
+                                placeholder="Contoh: Voucher Fisik Telkomsel - 1 Hari"
+                            />
+                            <InputError :message="editForm.errors.title" />
+                        </div>
+
+                        <div class="grid gap-2">
+                            <Label for="edit_description">Deskripsi Voucher</Label>
+                            <textarea
+                                id="edit_description"
+                                :value="editForm.description"
+                                rows="2"
+                                placeholder="Contoh: 4 GB & 3 GB Local Internet, 20 Menit Telepon"
+                                class="border-input focus-visible:ring-ring w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs focus-visible:ring-2 focus-visible:outline-none"
+                                @input="editForm.description = ($event.target as HTMLTextAreaElement).value"
+                            ></textarea>
+                            <InputError :message="editForm.errors.description" />
+                        </div>
+                    </div>
+
+                    <!-- Ringkasan paket yang dipilih dari dropdown -->
+                    <div
+                        v-else
+                        class="rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground"
+                    >
+                        <div class="font-medium text-foreground">
+                            {{ editForm.title || '-' }}
+                        </div>
+                        <div class="mt-0.5">
+                            {{ editForm.description || '-' }}
+                        </div>
+                    </div>
+
                     <div class="grid gap-2">
                         <Label for="edit_serial_number">Serial Number (12 digit)</Label>
                         <div class="flex gap-2">

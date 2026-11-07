@@ -9,6 +9,7 @@ use App\Http\Requests\Admin\VoucherRequest;
 use App\Http\Requests\Admin\VoucherUpdateRequest;
 use App\Jobs\ValidateVoucherBatchJob;
 use App\Models\City;
+use App\Models\Product;
 use App\Models\Voucher;
 use App\Services\TelkomselVoucherService;
 use App\Services\VoucherInventoryService;
@@ -56,13 +57,17 @@ class VoucherController extends Controller
             : [];
 
         $vouchers = Voucher::query()
-            ->with(['product:id,name,sell_price,hpp_price', 'cities:id'])
+            ->with(['product:id,name,quota_description,sell_price,hpp_price', 'cities:id'])
             ->forCity($request->user()?->isKabupatenAdmin() ? $request->user()->managedCityIds() : null)
             ->when($filters['status'], fn (Builder $query, string $status) => $query->where('status', $status))
             ->when($filters['search'], function (Builder $query, string $search): void {
                 $query->where(function (Builder $inner) use ($search): void {
                     $inner->where('serial_number', 'like', "%{$search}%")
-                        ->orWhere('redeemed_msisdn', 'like', "%{$search}%");
+                        ->orWhere('redeemed_msisdn', 'like', "%{$search}%")
+                        ->orWhereHas('product', function (Builder $p) use ($search): void {
+                            $p->where('name', 'like', "%{$search}%")
+                                ->orWhere('quota_description', 'like', "%{$search}%");
+                        });
                 });
             })
             ->latest('created_at')
@@ -72,6 +77,8 @@ class VoucherController extends Controller
                 'id' => $voucher->id,
                 'serial_number' => $voucher->serial_number,
                 'product_name' => $voucher->product?->name,
+                'title' => $voucher->product?->name,
+                'description' => $voucher->product?->quota_description,
                 'sell_price' => $voucher->product !== null ? (float) $voucher->product->sell_price : null,
                 'hpp_price' => $voucher->product !== null ? (float) $voucher->product->hpp_price : null,
                 'margin_percentage' => ($voucher->product !== null && (float) $voucher->product->hpp_price > 0)
@@ -85,12 +92,28 @@ class VoucherController extends Controller
                 'created_at' => $voucher->created_at?->toIso8601String(),
             ]);
 
+        $products = Product::query()
+            ->when(! empty($cityIds), fn (Builder $q) => $q->where(fn (Builder $inner) => $inner
+                ->whereIn('city_id', $cityIds)
+                ->orWhereNull('city_id')
+            ))
+            ->orderBy('name')
+            ->get(['id', 'name', 'quota_description', 'sell_price', 'hpp_price'])
+            ->map(fn (Product $p): array => [
+                'id' => $p->id,
+                'name' => $p->name,
+                'quota_description' => $p->quota_description,
+                'sell_price' => (float) $p->sell_price,
+                'hpp_price' => (float) $p->hpp_price,
+            ]);
+
         return Inertia::render('admin/vouchers/Index', [
             'vouchers' => $vouchers,
             'filters' => $filters,
             'statusCounts' => $this->statusCounts($request->user()?->isKabupatenAdmin() ? $request->user()->managedCityIds() : null),
             'is_super_admin' => $isSuperAdmin,
             'cities' => $cities,
+            'products' => $products,
         ]);
     }
 
@@ -238,14 +261,47 @@ class VoucherController extends Controller
             $voucher->city_id = count($cityIds) === 1 ? $cityIds[0] : null;
         }
 
-        $voucher->save();
+        $title = $request->filled('title')
+            ? trim((string) $request->input('title'))
+            : ($voucher->product?->name ?: 'Voucher Fisik Telkomsel');
+        $description = $request->has('description') && trim((string) $request->input('description')) !== ''
+            ? trim((string) $request->input('description'))
+            : ($voucher->product?->quota_description ?: $title);
 
-        if ($voucher->product !== null) {
+        $isSharedProduct = $voucher->product_id !== null && Voucher::query()
+            ->where('product_id', $voucher->product_id)
+            ->where('id', '!=', $voucher->id)
+            ->exists();
+
+        if ($isSharedProduct) {
+            $checkData = [
+                'name' => $title,
+                'description' => $description,
+                'validity' => (string) ($voucher->validity ?: ($voucher->product?->validity_days ?: '1')),
+                'region' => (string) ($voucher->region ?: ($voucher->product?->region ?: '')),
+                'serial_number' => $voucher->serial_number,
+            ];
+
+            $newProduct = $this->inventory->resolveProduct(
+                $checkData,
+                $finalSellPrice,
+                $voucher->city_id,
+                $basePrice,
+                $title,
+                $description
+            );
+
+            $voucher->product_id = $newProduct->id;
+        } elseif ($voucher->product !== null) {
             $voucher->product->update([
+                'name' => $title,
+                'quota_description' => $description,
                 'sell_price' => $finalSellPrice,
                 'hpp_price' => $basePrice,
             ]);
         }
+
+        $voucher->save();
 
         Inertia::flash('toast', [
             'type' => 'success',

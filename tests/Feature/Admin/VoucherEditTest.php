@@ -17,32 +17,44 @@ beforeEach(function () {
     ]);
 });
 
-test('super admin can update voucher details and pricing', function () {
-    $voucher = Voucher::factory()->create([
+test('super admin can update voucher using serial number as identifier without affecting other vouchers', function () {
+    $voucher1 = Voucher::factory()->create([
         'product_id' => $this->product->id,
         'serial_number' => '111122223333',
-        'hrn' => '71125613431848001',
+        'status' => VoucherStatus::Available,
+    ]);
+    $voucher2 = Voucher::factory()->create([
+        'product_id' => $this->product->id,
+        'serial_number' => '555566667777',
         'status' => VoucherStatus::Available,
     ]);
 
     $response = $this->actingAs($this->admin)
-        ->put("/admin/vouchers/{$voucher->id}", [
-            'serial_number' => '111122223334',
-            'sell_price' => 30000,
-            'margin_percentage' => 5,
-            'status' => 'EXPIRED',
+        ->put("/admin/vouchers/{$voucher1->serial_number}", [
+            'title' => 'Paket Khusus 15GB',
+            'description' => '15 GB Kuota Malam',
+            'serial_number' => '111122223333',
+            'sell_price' => 50000,
+            'margin_percentage' => 0,
+            'status' => 'AVAILABLE',
         ]);
 
     $response->assertRedirect('/admin/vouchers');
 
-    $voucher->refresh();
-    expect($voucher->serial_number)->toBe('111122223334')
-        ->and($voucher->status)->toBe(VoucherStatus::Expired)
-        ->and($voucher->hrn)->toBe('71125613431848001'); // HRN unchanged
-
+    $voucher1->refresh();
+    $voucher2->refresh();
     $this->product->refresh();
-    expect((float) $this->product->hpp_price)->toBe(30000.0)
-        ->and((float) $this->product->sell_price)->toBe(31500.0); // 30000 + 5% = 31500
+
+    // Voucher 1 should have been moved to a new/resolved product
+    expect($voucher1->product_id)->not->toBe($this->product->id)
+        ->and($voucher1->product->name)->toBe('Paket Khusus 15GB')
+        ->and((float) $voucher1->product->sell_price)->toBe(50000.0)
+        ->and($voucher1->product->quota_description)->toBe('15 GB Kuota Malam');
+
+    // Voucher 2 and original product MUST remain unchanged!
+    expect($voucher2->product_id)->toBe($this->product->id)
+        ->and($voucher2->product->name)->toBe($this->product->name)
+        ->and((float) $voucher2->product->sell_price)->toBe(20400.0);
 });
 
 test('updating voucher with new hrn encrypts and saves it', function () {

@@ -10,6 +10,7 @@ use App\Models\Voucher;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -124,6 +125,53 @@ class ProductController extends Controller
         Inertia::flash('toast', [
             'type' => 'success',
             'message' => "Paket {$product->name} berhasil diperbarui.",
+        ]);
+
+        return back();
+    }
+
+    /**
+     * Delete a product catalog item.
+     *
+     * Only products with 0 available stock can be deleted. If the product has ever
+     * been purchased or has historical records (orders or redeemed/reserved vouchers),
+     * it is soft-deleted to preserve transaction history. Otherwise, it is force-deleted.
+     */
+    public function destroy(Request $request, Product $product): RedirectResponse
+    {
+        if ($request->user()?->isKabupatenAdmin()) {
+            $userCityIds = $request->user()->managedCityIds();
+            $hasAccess = $product->city_id !== null && in_array($product->city_id, $userCityIds, true);
+            abort_unless($hasAccess, 403, 'Anda tidak berhak menghapus katalog di luar wilayah Anda.');
+        }
+
+        // Prevent deletion if there is still active available stock
+        $availableStock = $product->vouchers()
+            ->where('status', VoucherStatus::Available)
+            ->count();
+
+        if ($availableStock > 0) {
+            throw ValidationException::withMessages([
+                'product' => 'Katalog tidak dapat dihapus karena masih memiliki stok voucher yang aktif.',
+            ]);
+        }
+
+        $hasBeenPurchased = $product->orders()->exists()
+            || $product->vouchers()->whereIn('status', [VoucherStatus::Redeemed, VoucherStatus::Reserved])->exists();
+
+        if ($hasBeenPurchased) {
+            $product->delete();
+            $message = "Katalog {$product->name} berhasil dihapus (diarsipkan).";
+        } else {
+            // Delete any unredeemed vouchers first to avoid orphaned records or foreign key restrictions
+            $product->vouchers()->delete();
+            $product->forceDelete();
+            $message = "Katalog {$product->name} berhasil dihapus permanen.";
+        }
+
+        Inertia::flash('toast', [
+            'type' => 'success',
+            'message' => $message,
         ]);
 
         return back();
