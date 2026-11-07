@@ -304,6 +304,8 @@ class VoucherController extends Controller
     public function bulkStore(Request $request): RedirectResponse|JsonResponse
     {
         $rules = [
+            'title' => ['nullable', 'string', 'max:150'],
+            'description' => ['nullable', 'string', 'max:1000'],
             'file' => ['nullable', 'required_without:rows', 'file', 'mimes:csv,txt', 'max:5120'],
             'rows' => ['nullable', 'required_without:file', 'array', 'min:1'],
             'rows.*.serial_number' => ['required_with:rows', 'string'],
@@ -446,7 +448,18 @@ class VoucherController extends Controller
             'errors' => [],
         ], now()->addHours(24));
 
-        ValidateVoucherBatchJob::dispatch($rows, $request->user()?->id, $cityIds, $marginPercentage, $batchId);
+        $title = ! empty($validated['title']) ? trim((string) $validated['title']) : 'Voucher Fisik Telkomsel';
+        $description = ! empty($validated['description']) ? trim((string) $validated['description']) : $title;
+
+        ValidateVoucherBatchJob::dispatch(
+            $rows,
+            $request->user()?->id,
+            $cityIds,
+            $marginPercentage,
+            $batchId,
+            title: $title,
+            description: $description,
+        );
 
         if ($request->wantsJson()) {
             return response()->json([
@@ -555,7 +568,7 @@ class VoucherController extends Controller
                 continue;
             }
 
-            [$serial, $hrn, $sellPrice] = array_pad($line, 3, null);
+            [$serial, $hrn, $sellPrice, $rowTitle, $rowDesc] = array_pad($line, 5, null);
 
             $serial = preg_replace('/\D/', '', trim((string) $serial));
             if (strlen($serial) > 12) {
@@ -581,11 +594,21 @@ class VoucherController extends Controller
                 throw new \RuntimeException("Baris voucher serial {$serial} memiliki harga 0 atau tidak valid. Harga voucher tidak boleh 0.");
             }
 
-            $rows[] = [
+            $row = [
                 'serial_number' => $serial,
                 'hrn' => $hrn,
                 'sell_price' => (float) $sellPrice,
             ];
+
+            if ($rowTitle !== null && trim((string) $rowTitle) !== '') {
+                $row['title'] = trim((string) $rowTitle);
+            }
+
+            if ($rowDesc !== null && trim((string) $rowDesc) !== '') {
+                $row['description'] = trim((string) $rowDesc);
+            }
+
+            $rows[] = $row;
         }
 
         fclose($handle);

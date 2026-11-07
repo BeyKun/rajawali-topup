@@ -26,7 +26,7 @@ class ValidateVoucherBatchJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     /**
-     * @param  array<int, array{serial_number: string, hrn: string, sell_price: float}>  $rows
+     * @param  array<int, array{serial_number: string, hrn: string, sell_price: float, title?: string, description?: string}>  $rows
      * @param  array<int, int>  $cityIds
      */
     public function __construct(
@@ -35,6 +35,8 @@ class ValidateVoucherBatchJob implements ShouldQueue
         public array $cityIds = [],
         public ?float $marginPercentage = null,
         public ?string $batchId = null,
+        public ?string $title = null,
+        public ?string $description = null,
     ) {
         $this->batchId ??= (string) Str::uuid();
     }
@@ -95,6 +97,8 @@ class ValidateVoucherBatchJob implements ShouldQueue
                     $this->cityIds,
                     hppPrice: $basePrice,
                     validateTelkomsel: false,
+                    customTitle: $row['title'] ?? $this->title,
+                    customDescription: $row['description'] ?? $this->description,
                 );
 
                 $stored++;

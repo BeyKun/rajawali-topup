@@ -47,6 +47,8 @@ class VoucherInventoryService
         array $cityIds = [],
         ?float $hppPrice = null,
         bool $validateTelkomsel = true,
+        ?string $customTitle = null,
+        ?string $customDescription = null,
     ): Voucher {
         $serialNumber = trim($serialNumber);
         $hrn = trim($hrn);
@@ -93,14 +95,17 @@ class VoucherInventoryService
                 ]);
             }
         } else {
+            $title = ! empty($customTitle) ? trim($customTitle) : 'Voucher Fisik Telkomsel';
+            $description = ! empty($customDescription) ? trim($customDescription) : $title;
+
             // Default voucher package metadata saat cek Telkomsel di-bypass pada bulk upload
             $check = [
                 'is_valid' => true,
                 'status_code' => 1,
                 'status_message' => 'Tersedia',
                 'serial_number' => $serialNumber,
-                'name' => 'Voucher Fisik Telkomsel',
-                'description' => 'Voucher Fisik Telkomsel',
+                'name' => $title,
+                'description' => $description,
                 'validity' => '',
                 'expired_date' => '',
                 'region' => '',
@@ -108,7 +113,7 @@ class VoucherInventoryService
             ];
         }
 
-        return DB::transaction(function () use ($check, $serialNumber, $hrn, $sellPrice, $adminId, $cityIds, $hppPrice): Voucher {
+        return DB::transaction(function () use ($check, $serialNumber, $hrn, $sellPrice, $adminId, $cityIds, $hppPrice, $customTitle, $customDescription): Voucher {
             $effectiveCityIds = array_values(array_unique(array_filter(array_map('intval', $cityIds))));
 
             if (empty($effectiveCityIds)) {
@@ -121,7 +126,7 @@ class VoucherInventoryService
             $primaryCityId = count($effectiveCityIds) === 1 ? $effectiveCityIds[0] : null;
             $productCityId = count($effectiveCityIds) === 1 ? $effectiveCityIds[0] : null;
 
-            $product = $this->resolveProduct($check, $sellPrice, $productCityId, $hppPrice);
+            $product = $this->resolveProduct($check, $sellPrice, $productCityId, $hppPrice, $customTitle, $customDescription);
 
             $voucher = Voucher::query()->create([
                 'product_id' => $product->id,
@@ -180,14 +185,17 @@ class VoucherInventoryService
         ?float $sellPrice,
         ?int $cityId = null,
         ?float $hppPrice = null,
+        ?string $customTitle = null,
+        ?string $customDescription = null,
     ): Product {
-        $name = $this->deriveProductName($check);
-        $slug = $this->deriveProductSlug($name, $check, $cityId);
+        $name = ! empty($customTitle) ? trim($customTitle) : $this->deriveProductName($check);
+        $description = ! empty($customDescription) ? trim($customDescription) : ($check['description'] !== '' ? $check['description'] : $name);
+        $slug = $this->deriveProductSlug($name, $description, $check, $cityId, $sellPrice);
 
         $product = Product::query()->firstOrNew(['slug' => $slug]);
 
         $product->name = $name;
-        $product->quota_description = $check['description'] !== '' ? $check['description'] : $name;
+        $product->quota_description = $description;
         $product->validity_days = $this->parseValidityDays($check['validity']);
         $product->region = $check['region'] !== '' ? $check['region'] : null;
 
@@ -270,14 +278,27 @@ class VoucherInventoryService
     /**
      * Derive a stable, unique slug that also encodes the package identity.
      *
-     * The identity hash guarantees that two packages sharing a display name but
-     * differing in quota, region or assigned city never collapse into a single product.
+     * The identity hash guarantees that packages differing in quota, region,
+     * assigned city, or price never collapse into a single product.
      *
      * @param  array{name: string, description: string, validity: string, region: string}  $check
      */
-    protected function deriveProductSlug(string $name, array $check, ?int $cityId = null): string
-    {
-        $identity = implode('|', [$name, $check['description'], $check['validity'], $check['region'], (string) $cityId]);
+    protected function deriveProductSlug(
+        string $name,
+        string $description,
+        array $check,
+        ?int $cityId = null,
+        ?float $sellPrice = null,
+    ): string {
+        $priceKey = $sellPrice !== null ? number_format((float) $sellPrice, 2, '.', '') : '0.00';
+        $identity = implode('|', [
+            $name,
+            $description,
+            $priceKey,
+            $check['validity'] ?? '',
+            $check['region'] ?? '',
+            (string) $cityId,
+        ]);
         $suffix = substr(sha1($identity), 0, 8);
         $base = Str::limit(Str::slug($name), self::PRODUCT_SLUG_LIMIT, '');
 

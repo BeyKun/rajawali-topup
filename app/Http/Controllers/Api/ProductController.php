@@ -39,15 +39,25 @@ class ProductController extends Controller
                     )),
             ])
             ->where('is_active', true)
-            ->when($cityId !== null, fn ($query) => $query
-                ->where(fn ($inner) => $inner
-                    ->where('city_id', $cityId)
-                    ->orWhereNull('city_id')))
+            ->when($cityId !== null, function ($query) use ($cityId) {
+                $query->where(function ($q) use ($cityId) {
+                    $q->where('products.city_id', $cityId)
+                        ->orWhereHas('vouchers', fn ($vq) => $vq->where(fn ($inner) => $inner
+                            ->where('vouchers.city_id', $cityId)
+                            ->orWhereHas('cities', fn ($cq) => $cq->where('cities.id', $cityId))
+                        ))
+                        ->orWhere(function ($nat) {
+                            $nat->whereNull('products.city_id')
+                                ->whereDoesntHave('vouchers', fn ($vq) => $vq->where(fn ($inner) => $inner
+                                    ->whereNotNull('vouchers.city_id')
+                                    ->orWhereHas('cities')
+                                ));
+                        });
+                });
+            })
             ->orderBy('sort_order')
             ->orderBy('id')
-            ->get()
-            ->filter(fn (Product $product): bool => (int) $product->stock_count > 0)
-            ->values();
+            ->get();
 
         return response()->json([
             'success' => true,

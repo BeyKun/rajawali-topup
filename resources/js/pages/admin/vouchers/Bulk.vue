@@ -86,6 +86,12 @@ const fixedMargin = computed(() => props.default_margin ?? 2);
 const activeTab = ref<'photo' | 'csv'>('photo');
 
 // -----------------------------------------------------------------------------
+// Manual Title & Description for Bulk Batch
+// -----------------------------------------------------------------------------
+const batchTitle = ref('');
+const batchDescription = ref('');
+
+// -----------------------------------------------------------------------------
 // Photo OCR State & Handlers
 // -----------------------------------------------------------------------------
 const photoFile = ref<File | null>(null);
@@ -130,7 +136,7 @@ function applyBulkPrice(): void {
 const showDownloadTemplateDialog = ref(false);
 
 function triggerTemplateDownload(): void {
-    const csv = 'serial_number,hrn,sell_price\n300338120354,71125613431848001,25000\n';
+    const csv = 'serial_number,hrn,sell_price,title,description\n300338120354,71125613431848001,25000,Telkomsel 7GB 5 Hari,7 GB Kuota Internet Nasional 5 Hari\n';
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -579,6 +585,8 @@ const incompleteVouchersCount = computed(() => {
 
 const isPhotoSubmitValid = computed(() => {
     return (
+        batchTitle.value.trim() !== '' &&
+        batchDescription.value.trim() !== '' &&
         scannedRows.value.length > 0 &&
         scannedRows.value.every(
             (r) => cleanDigits(r.serial_number).length === 12 && cleanDigits(r.hrn) !== '' && Number(r.sell_price || 0) > 0,
@@ -714,6 +722,13 @@ function parseFriendlyError(errors: Record<string, any>): string {
 }
 
 async function submitPhotoRows(): Promise<void> {
+    if (!batchTitle.value.trim() || !batchDescription.value.trim()) {
+        showSubmitModal.value = true;
+        submitStatus.value = 'error';
+        submitErrorMessage.value = 'Judul Voucher dan Deskripsi Voucher wajib diisi sebelum menyimpan data.';
+        return;
+    }
+
     const preparedRows = scannedRows.value.map((r) => {
         let serial = cleanDigits(r.serial_number);
         if (serial.length > 12) {
@@ -788,6 +803,8 @@ async function submitPhotoRows(): Promise<void> {
                 'X-XSRF-TOKEN': getCsrfToken(),
             },
             body: JSON.stringify({
+                title: batchTitle.value.trim(),
+                description: batchDescription.value.trim(),
                 rows: preparedRows,
                 city_ids: selectedCityIds.value,
             }),
@@ -832,6 +849,11 @@ function onCsvChange(event: Event): void {
 }
 
 async function submitCsv(): Promise<void> {
+    if (!batchTitle.value.trim() || !batchDescription.value.trim()) {
+        toast.error('Judul Voucher dan Deskripsi Voucher wajib diisi.');
+        return;
+    }
+
     if (!csvForm.file) {
         toast.error('Pilih berkas CSV terlebih dahulu.');
         return;
@@ -850,6 +872,8 @@ async function submitCsv(): Promise<void> {
     };
 
     const formData = new FormData();
+    formData.append('title', batchTitle.value.trim());
+    formData.append('description', batchDescription.value.trim());
     formData.append('file', csvForm.file);
     selectedCityIds.value.forEach((id) => formData.append('city_ids[]', String(id)));
 
@@ -897,6 +921,8 @@ function resetAndUploadMore(): void {
     showSubmitModal.value = false;
     clearAllScanned();
     csvForm.reset();
+    batchTitle.value = '';
+    batchDescription.value = '';
 }
 </script>
 
@@ -1069,14 +1095,46 @@ function resetAndUploadMore(): void {
                     </div>
                 </div>
 
-                <!-- Poin 4: Pengaturan Batch Voucher hanya tampil untuk super admin saja dan cuma input wilayah berlaku -->
-                <div v-if="props.is_super_admin" class="rounded-xl border bg-card p-4 space-y-3">
+                <!-- Pengaturan Paket & Batch Voucher -->
+                <div class="rounded-xl border bg-card p-4 space-y-4">
                     <h4 class="text-sm font-semibold flex items-center gap-2">
-                        <Wand2 class="size-4 text-primary" /> Pengaturan Batch Voucher
+                        <Wand2 class="size-4 text-primary" /> Informasi Paket Voucher
                     </h4>
 
-                    <div class="grid gap-1.5">
-                        <Label class="text-xs">Wilayah Berlaku</Label>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="grid gap-1.5">
+                            <Label for="batch-title-photo" class="text-xs font-medium">
+                                Judul Voucher <span class="text-destructive">*</span>
+                            </Label>
+                            <Input
+                                id="batch-title-photo"
+                                v-model="batchTitle"
+                                placeholder="Contoh: Telkomsel 7GB 5 Hari"
+                                class="h-9 text-xs"
+                            />
+                            <p class="text-[11px] text-muted-foreground">
+                                Nama paket yang akan ditampilkan kepada pembeli pada aplikasi mobile.
+                            </p>
+                        </div>
+
+                        <div class="grid gap-1.5">
+                            <Label for="batch-desc-photo" class="text-xs font-medium">
+                                Deskripsi Voucher <span class="text-destructive">*</span>
+                            </Label>
+                            <Input
+                                id="batch-desc-photo"
+                                v-model="batchDescription"
+                                placeholder="Contoh: 7 GB Kuota Internet Nasional 5 Hari"
+                                class="h-9 text-xs"
+                            />
+                            <p class="text-[11px] text-muted-foreground">
+                                Penjelasan detail rincian kuota atau masa berlaku voucher.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div v-if="props.is_super_admin" class="grid gap-1.5 pt-2 border-t">
+                        <Label class="text-xs font-medium">Wilayah Berlaku</Label>
                         <SearchableCityMultiSelect
                             v-model="selectedCityIds"
                             :cities="props.cities || []"
@@ -1408,8 +1466,38 @@ function resetAndUploadMore(): void {
                 class="space-y-6 rounded-xl border p-6"
                 @submit.prevent="submitCsv"
             >
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="grid gap-2">
+                        <Label for="batch-title-csv" class="font-medium">
+                            Judul Voucher <span class="text-destructive">*</span>
+                        </Label>
+                        <Input
+                            id="batch-title-csv"
+                            v-model="batchTitle"
+                            placeholder="Contoh: Telkomsel 7GB 5 Hari"
+                        />
+                        <p class="text-xs text-muted-foreground">
+                            Nama paket yang akan ditampilkan kepada pembeli pada aplikasi mobile.
+                        </p>
+                    </div>
+
+                    <div class="grid gap-2">
+                        <Label for="batch-desc-csv" class="font-medium">
+                            Deskripsi Voucher <span class="text-destructive">*</span>
+                        </Label>
+                        <Input
+                            id="batch-desc-csv"
+                            v-model="batchDescription"
+                            placeholder="Contoh: 7 GB Kuota Internet Nasional 5 Hari"
+                        />
+                        <p class="text-xs text-muted-foreground">
+                            Penjelasan detail rincian kuota atau masa berlaku voucher.
+                        </p>
+                    </div>
+                </div>
+
                 <div class="grid gap-2">
-                    <Label for="file">File CSV</Label>
+                    <Label for="file">File CSV <span class="text-destructive">*</span></Label>
                     <Input
                         id="file"
                         type="file"
@@ -1450,11 +1538,12 @@ function resetAndUploadMore(): void {
                 <p class="mb-3 text-sm text-muted-foreground">
                     File CSV boleh tanpa header atau dengan header. Kolom
                     dipisahkan koma, titik koma, atau tab dengan urutan:
-                    <span class="font-mono">serial_number, hrn, sell_price</span>.
+                    <span class="font-mono">serial_number, hrn, sell_price</span> (opsional: <span class="font-mono">title, description</span>).
+                    Jika kolom title dan description tidak diisi di CSV, sistem akan menggunakan Judul dan Deskripsi dari isian form di atas.
                 </p>
-                <pre class="overflow-x-auto rounded-md bg-muted p-3 text-xs">serial_number,hrn,sell_price
-300338120354,71125613431848001,25000
-300338120355,71125613431848002,25000</pre>
+                <pre class="overflow-x-auto rounded-md bg-muted p-3 text-xs">serial_number,hrn,sell_price,title,description
+300338120354,71125613431848001,25000,Telkomsel 7GB 5 Hari,7 GB Kuota Internet Nasional 5 Hari
+300338120355,71125613431848002,25000,Telkomsel 7GB 5 Hari,7 GB Kuota Internet Nasional 5 Hari</pre>
                 <Button
                     type="button"
                     variant="outline"

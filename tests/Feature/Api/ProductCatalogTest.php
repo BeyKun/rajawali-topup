@@ -56,12 +56,16 @@ test('products endpoint hides inactive products', function () {
         ->assertJsonCount(0, 'data');
 });
 
-test('products endpoint hides products with no available stock', function () {
-    catalogProduct(['is_active' => true], availableStock: 0);
+test('products endpoint returns products with no available stock as unavailable with 0 stock count', function () {
+    $product = catalogProduct(['is_active' => true], availableStock: 0);
 
-    $this->getJson('/api/v1/products')
+    $response = $this->getJson('/api/v1/products')
         ->assertOk()
-        ->assertJsonCount(0, 'data');
+        ->assertJsonCount(1, 'data');
+
+    expect($response->json('data.0.id'))->toBe($product->id)
+        ->and($response->json('data.0.stock_count'))->toBe(0)
+        ->and($response->json('data.0.is_available'))->toBeFalse();
 });
 
 test('products are sorted by sort_order then id', function () {

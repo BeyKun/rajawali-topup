@@ -159,3 +159,50 @@ test('bulk import csv rejects file with zero sell price', function () {
 
     expect(Voucher::query()->count())->toBe(0);
 });
+
+test('bulk import groups vouchers by title description and price into products', function () {
+    $rows = [
+        [
+            'serial_number' => '300338120354',
+            'hrn' => '71125613431848001',
+            'sell_price' => 25000,
+        ],
+        [
+            'serial_number' => '300338120355',
+            'hrn' => '71125613431848002',
+            'sell_price' => 25000,
+        ],
+        [
+            'serial_number' => '300338120356',
+            'hrn' => '71125613431848003',
+            'sell_price' => 30000,
+        ],
+    ];
+
+    $this->actingAs($this->admin)
+        ->post('/admin/vouchers/bulk', [
+            'title' => 'Telkomsel Flash Max',
+            'description' => '10 GB Kuota Utama 30 Hari',
+            'rows' => $rows,
+            'margin_percentage' => 0,
+        ])
+        ->assertRedirect('/admin/vouchers/bulk');
+
+    expect(Voucher::query()->count())->toBe(3);
+
+    // Because row 1 & row 2 have price 25000 (+2% margin = 25500), and row 3 has price 30000 (+2% margin = 30600), exactly 2 products must be created
+    expect(Product::query()->count())->toBe(2);
+
+    $p25 = Product::query()->where('sell_price', 25500)->first();
+    $p30 = Product::query()->where('sell_price', 30600)->first();
+
+    expect($p25)->not->toBeNull()
+        ->and($p25->name)->toBe('Telkomsel Flash Max')
+        ->and($p25->quota_description)->toBe('10 GB Kuota Utama 30 Hari')
+        ->and($p25->vouchers()->count())->toBe(2);
+
+    expect($p30)->not->toBeNull()
+        ->and($p30->name)->toBe('Telkomsel Flash Max')
+        ->and($p30->quota_description)->toBe('10 GB Kuota Utama 30 Hari')
+        ->and($p30->vouchers()->count())->toBe(1);
+});
