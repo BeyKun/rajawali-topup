@@ -77,3 +77,15 @@ test('products are sorted by sort_order then id', function () {
     expect($response->json('data.0.id'))->toBe($first->id)
         ->and($response->json('data.1.id'))->toBe($second->id);
 });
+
+test('available products with stock appear before out of stock products', function () {
+    $outOfStockEarlyOrder = catalogProduct(['sort_order' => 1, 'name' => 'Habis'], availableStock: 0);
+    $inStockLaterOrder = catalogProduct(['sort_order' => 5, 'name' => 'Tersedia'], availableStock: 3);
+
+    $response = $this->getJson('/api/v1/products')->assertOk();
+
+    expect($response->json('data.0.id'))->toBe($inStockLaterOrder->id)
+        ->and($response->json('data.0.stock_count'))->toBe(3)
+        ->and($response->json('data.1.id'))->toBe($outOfStockEarlyOrder->id)
+        ->and($response->json('data.1.stock_count'))->toBe(0);
+});

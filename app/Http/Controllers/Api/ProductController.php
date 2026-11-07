@@ -57,7 +57,13 @@ class ProductController extends Controller
             })
             ->orderBy('sort_order')
             ->orderBy('id')
-            ->get();
+            ->get()
+            ->sortBy([
+                fn (Product $a, Product $b) => ((int) $b->stock_count > 0 ? 1 : 0) <=> ((int) $a->stock_count > 0 ? 1 : 0),
+                fn (Product $a, Product $b) => $a->sort_order <=> $b->sort_order,
+                fn (Product $a, Product $b) => $a->id <=> $b->id,
+            ])
+            ->values();
 
         return response()->json([
             'success' => true,
