@@ -17,6 +17,8 @@ export interface ScannedVoucherRow {
     serial_number: string;
     hrn: string;
     sell_price: number;
+    title?: string;
+    description?: string;
     serial_status: 'valid' | 'warning' | 'invalid';
     hrn_status: 'valid' | 'warning' | 'invalid';
     check_loading?: boolean;

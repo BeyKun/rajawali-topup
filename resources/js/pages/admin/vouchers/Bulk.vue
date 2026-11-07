@@ -252,6 +252,8 @@ async function startOcrScan(file: File): Promise<void> {
                 serial_number: formatSerialNumber(serial),
                 hrn: formatHrn(r.hrn),
                 sell_price: defaultBatchPrice.value,
+                title: '',
+                description: '',
             };
         });
 
@@ -259,6 +261,7 @@ async function startOcrScan(file: File): Promise<void> {
 
         if (scannedRows.value.length > 0) {
             toast.success(`Berhasil mendeteksi ${scannedRows.value.length} voucher dengan RapidOCR!`);
+            populateDefaultsFromFirstScannedRow();
         } else {
             toast.warning('Tidak ada voucher yang terdeteksi secara otomatis. Silakan periksa ketajaman foto atau tambah voucher manual.');
         }
@@ -288,11 +291,14 @@ async function startOcrScan(file: File): Promise<void> {
                     serial_number: formatSerialNumber(serial),
                     hrn: formatHrn(r.hrn),
                     sell_price: defaultBatchPrice.value,
+                    title: '',
+                    description: '',
                 };
             });
 
             if (scannedRows.value.length > 0) {
                 toast.success(`Berhasil mendeteksi ${scannedRows.value.length} voucher dari foto!`);
+                populateDefaultsFromFirstScannedRow();
             } else {
                 toast.warning('Tidak ada voucher yang terdeteksi secara otomatis. Silakan periksa ketajaman foto atau tambah voucher manual.');
             }
@@ -305,6 +311,91 @@ async function startOcrScan(file: File): Promise<void> {
     }
 }
 
+const isFetchingDefaults = ref(false);
+
+async function populateDefaultsFromFirstScannedRow(force: boolean = false): Promise<void> {
+    const candidateRows = scannedRows.value
+        .filter((r) => cleanDigits(r.serial_number).length === 12)
+        .slice(0, 3);
+
+    if (candidateRows.length === 0) return;
+
+    isFetchingDefaults.value = true;
+
+    for (const row of candidateRows) {
+        const serial = cleanDigits(row.serial_number);
+        row.check_loading = true;
+
+        try {
+            const response = await fetch('/admin/vouchers/check', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    'X-CSRF-TOKEN': getCsrfToken(),
+                    'X-XSRF-TOKEN': getCsrfToken(),
+                },
+                body: JSON.stringify({ serial_number: serial }),
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                row.check_result = data;
+
+                const name = (data.name || '').trim();
+                const desc = (data.description || '').trim();
+                const validity = (data.validity || '').trim();
+
+                let defaultTitle = name;
+                if (defaultTitle && validity && !defaultTitle.toLowerCase().includes('hari')) {
+                    defaultTitle = `${defaultTitle} ${validity} Hari`;
+                }
+                if (!defaultTitle && desc) {
+                    defaultTitle = desc;
+                }
+                const defaultDesc = desc || defaultTitle || 'Voucher Fisik Telkomsel';
+                defaultTitle = defaultTitle || 'Voucher Fisik Telkomsel';
+
+                scannedRows.value.forEach((r, idx) => {
+                    if (force || !(r.title || '').trim() || idx === 0) {
+                        r.title = defaultTitle;
+                    }
+                    if (force || !(r.description || '').trim() || idx === 0) {
+                        r.description = defaultDesc;
+                    }
+                });
+
+                toast.success(`Judul & deskripsi terisi otomatis dari row pertama: "${defaultTitle}"`);
+                row.check_loading = false;
+                break;
+            }
+        } catch (err) {
+            console.warn('Gagal cek voucher row pertama untuk default value:', err);
+        } finally {
+            row.check_loading = false;
+        }
+    }
+
+    isFetchingDefaults.value = false;
+}
+
+function applyFirstRowTitleAndDescToAll(): void {
+    const first = scannedRows.value[0];
+    if (!first || !(first.title || '').trim()) {
+        toast.warning('Judul voucher pada baris pertama masih kosong.');
+        return;
+    }
+    const title = (first.title || '').trim();
+    const desc = (first.description || '').trim() || title;
+
+    scannedRows.value.forEach((r) => {
+        r.title = title;
+        r.description = desc;
+    });
+
+    toast.success(`Judul & deskripsi baris pertama diterapkan ke semua (${scannedRows.value.length}) voucher.`);
+}
+
 function reScan(): void {
     if (photoFile.value) {
         startOcrScan(photoFile.value);
@@ -312,11 +403,14 @@ function reScan(): void {
 }
 
 function addManualRow(): void {
+    const first = scannedRows.value[0];
     scannedRows.value.push({
         id: `manual-${Date.now()}`,
         serial_number: '',
         hrn: '',
         sell_price: defaultBatchPrice.value,
+        title: first?.title || '',
+        description: first?.description || '',
         serial_status: 'warning',
         hrn_status: 'warning',
     });
@@ -448,6 +542,27 @@ async function checkSingleVoucher(row: ScannedVoucherRow): Promise<void> {
         } else {
             toast.warning(`SN ${serial}: ${data.status_message} (kode ${data.status_code})`);
         }
+
+        if (data.is_valid || data.name || data.description) {
+            const name = (data.name || '').trim();
+            const desc = (data.description || '').trim();
+            const validity = (data.validity || '').trim();
+
+            let title = name;
+            if (title && validity && !title.toLowerCase().includes('hari')) {
+                title = `${title} ${validity} Hari`;
+            }
+            if (!title && desc) {
+                title = desc;
+            }
+            const description = desc || title;
+
+            if (title && (!batchTitle.value.trim() || !batchDescription.value.trim())) {
+                batchTitle.value = title;
+                batchDescription.value = description;
+                toast.info(`Judul & deskripsi voucher otomatis terisi: "${title}"`);
+            }
+        }
     } catch (e: any) {
         row.check_result = {
             is_valid: false,
@@ -575,7 +690,12 @@ async function checkAllVouchers(): Promise<void> {
 
 const validVouchersCount = computed(() => {
     return scannedRows.value.filter(
-        (r) => cleanDigits(r.serial_number).length === 12 && cleanDigits(r.hrn).length >= 14 && Number(r.sell_price || 0) > 0,
+        (r) =>
+            cleanDigits(r.serial_number).length === 12 &&
+            cleanDigits(r.hrn).length >= 14 &&
+            Number(r.sell_price || 0) > 0 &&
+            (r.title || '').trim() !== '' &&
+            (r.description || '').trim() !== '',
     ).length;
 });
 
@@ -585,11 +705,14 @@ const incompleteVouchersCount = computed(() => {
 
 const isPhotoSubmitValid = computed(() => {
     return (
-        batchTitle.value.trim() !== '' &&
-        batchDescription.value.trim() !== '' &&
         scannedRows.value.length > 0 &&
         scannedRows.value.every(
-            (r) => cleanDigits(r.serial_number).length === 12 && cleanDigits(r.hrn) !== '' && Number(r.sell_price || 0) > 0,
+            (r) =>
+                cleanDigits(r.serial_number).length === 12 &&
+                cleanDigits(r.hrn) !== '' &&
+                Number(r.sell_price || 0) > 0 &&
+                (r.title || '').trim() !== '' &&
+                (r.description || '').trim() !== '',
         )
     );
 });
@@ -722,10 +845,19 @@ function parseFriendlyError(errors: Record<string, any>): string {
 }
 
 async function submitPhotoRows(): Promise<void> {
-    if (!batchTitle.value.trim() || !batchDescription.value.trim()) {
+    const missingTitleRow = scannedRows.value.findIndex((r) => !(r.title || '').trim());
+    if (missingTitleRow !== -1) {
         showSubmitModal.value = true;
         submitStatus.value = 'error';
-        submitErrorMessage.value = 'Judul Voucher dan Deskripsi Voucher wajib diisi sebelum menyimpan data.';
+        submitErrorMessage.value = `Baris ke-${missingTitleRow + 1} belum memiliki Judul Voucher. Silakan lengkapi judul untuk seluruh voucher.`;
+        return;
+    }
+
+    const missingDescRow = scannedRows.value.findIndex((r) => !(r.description || '').trim());
+    if (missingDescRow !== -1) {
+        showSubmitModal.value = true;
+        submitStatus.value = 'error';
+        submitErrorMessage.value = `Baris ke-${missingDescRow + 1} belum memiliki Deskripsi Voucher. Silakan lengkapi deskripsi untuk seluruh voucher.`;
         return;
     }
 
@@ -738,6 +870,8 @@ async function submitPhotoRows(): Promise<void> {
             serial_number: serial,
             hrn: cleanDigits(r.hrn),
             sell_price: Number(r.sell_price) || 0,
+            title: (r.title || '').trim(),
+            description: (r.description || '').trim(),
         };
     });
 
@@ -803,8 +937,8 @@ async function submitPhotoRows(): Promise<void> {
                 'X-XSRF-TOKEN': getCsrfToken(),
             },
             body: JSON.stringify({
-                title: batchTitle.value.trim(),
-                description: batchDescription.value.trim(),
+                title: preparedRows[0]?.title || 'Voucher Fisik Telkomsel',
+                description: preparedRows[0]?.description || preparedRows[0]?.title || 'Voucher Fisik Telkomsel',
                 rows: preparedRows,
                 city_ids: selectedCityIds.value,
             }),
@@ -845,7 +979,64 @@ const csvForm = useForm<{
 
 function onCsvChange(event: Event): void {
     const target = event.target as HTMLInputElement;
-    csvForm.file = target.files?.[0] ?? null;
+    const file = target.files?.[0] ?? null;
+    csvForm.file = file;
+
+    if (file && (!batchTitle.value.trim() || !batchDescription.value.trim())) {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const text = (e.target?.result as string) || '';
+            const lines = text.split(/\r?\n/).filter((l) => l.trim() !== '');
+            if (lines.length > 0) {
+                let dataLine = lines[0];
+                if (/serial|seri|hrn|price|harga/i.test(lines[0]) && lines.length > 1) {
+                    dataLine = lines[1];
+                }
+                const delimiter = dataLine.includes('\t') ? '\t' : (dataLine.includes(';') ? ';' : ',');
+                const parts = dataLine.split(delimiter).map((p) => p.replace(/^["']|["']$/g, '').trim());
+                const [sn, , , rowTitle, rowDesc] = parts;
+
+                if (rowTitle && rowDesc) {
+                    batchTitle.value = rowTitle;
+                    batchDescription.value = rowDesc;
+                    toast.info(`Default judul & deskripsi terisi dari CSV: "${rowTitle}"`);
+                } else if (sn && cleanDigits(sn).length === 12) {
+                    try {
+                        const res = await fetch('/admin/vouchers/check', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                Accept: 'application/json',
+                                'X-CSRF-TOKEN': getCsrfToken(),
+                                'X-XSRF-TOKEN': getCsrfToken(),
+                            },
+                            body: JSON.stringify({ serial_number: cleanDigits(sn) }),
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            const name = (data.name || '').trim();
+                            const desc = (data.description || '').trim();
+                            const validity = (data.validity || '').trim();
+                            let title = name;
+                            if (title && validity && !title.toLowerCase().includes('hari')) {
+                                title = `${title} ${validity} Hari`;
+                            }
+                            if (!title && desc) title = desc;
+                            const description = desc || title;
+                            if (title) {
+                                batchTitle.value = title;
+                                batchDescription.value = description;
+                                toast.info(`Default judul & deskripsi terisi dari baris pertama: "${title}"`);
+                            }
+                        }
+                    } catch (err) {
+                        console.warn('Gagal cek CSV row pertama:', err);
+                    }
+                }
+            }
+        };
+        reader.readAsText(file.slice(0, 4096));
+    }
 }
 
 async function submitCsv(): Promise<void> {
@@ -1095,55 +1286,17 @@ function resetAndUploadMore(): void {
                     </div>
                 </div>
 
-                <!-- Pengaturan Paket & Batch Voucher -->
-                <div class="rounded-xl border bg-card p-4 space-y-4">
-                    <h4 class="text-sm font-semibold flex items-center gap-2">
-                        <Wand2 class="size-4 text-primary" /> Informasi Paket Voucher
-                    </h4>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="grid gap-1.5">
-                            <Label for="batch-title-photo" class="text-xs font-medium">
-                                Judul Voucher <span class="text-destructive">*</span>
-                            </Label>
-                            <Input
-                                id="batch-title-photo"
-                                v-model="batchTitle"
-                                placeholder="Contoh: Telkomsel 7GB 5 Hari"
-                                class="h-9 text-xs"
-                            />
-                            <p class="text-[11px] text-muted-foreground">
-                                Nama paket yang akan ditampilkan kepada pembeli pada aplikasi mobile.
-                            </p>
-                        </div>
-
-                        <div class="grid gap-1.5">
-                            <Label for="batch-desc-photo" class="text-xs font-medium">
-                                Deskripsi Voucher <span class="text-destructive">*</span>
-                            </Label>
-                            <Input
-                                id="batch-desc-photo"
-                                v-model="batchDescription"
-                                placeholder="Contoh: 7 GB Kuota Internet Nasional 5 Hari"
-                                class="h-9 text-xs"
-                            />
-                            <p class="text-[11px] text-muted-foreground">
-                                Penjelasan detail rincian kuota atau masa berlaku voucher.
-                            </p>
-                        </div>
-                    </div>
-
-                    <div v-if="props.is_super_admin" class="grid gap-1.5 pt-2 border-t">
-                        <Label class="text-xs font-medium">Wilayah Berlaku</Label>
-                        <SearchableCityMultiSelect
-                            v-model="selectedCityIds"
-                            :cities="props.cities || []"
-                            placeholder="Pilih wilayah kabupaten/kota berlaku..."
-                        />
-                        <p class="text-[11px] text-muted-foreground">
-                            Wilayah yang dipilih akan diterapkan ke seluruh voucher hasil scan ini. Jika kosong, sistem otomatis mendeteksi berdasarkan zona voucher.
-                        </p>
-                    </div>
+                <!-- Super Admin: Wilayah Berlaku -->
+                <div v-if="props.is_super_admin" class="rounded-xl border bg-card p-4 space-y-2">
+                    <Label class="text-xs font-medium">Wilayah Berlaku</Label>
+                    <SearchableCityMultiSelect
+                        v-model="selectedCityIds"
+                        :cities="props.cities || []"
+                        placeholder="Pilih wilayah kabupaten/kota berlaku..."
+                    />
+                    <p class="text-[11px] text-muted-foreground">
+                        Wilayah yang dipilih akan diterapkan ke seluruh voucher hasil scan ini. Jika kosong, sistem otomatis mendeteksi berdasarkan zona voucher.
+                    </p>
                 </div>
 
                 <!-- Review & Edit Extracted Vouchers Table -->
@@ -1169,23 +1322,10 @@ function resetAndUploadMore(): void {
                         </div>
 
                         <!-- Poin 8: Hilangkan button raw OCR. Poin 9: Tambahkan button Set Satu Harga. Poin 10: Ganti text Tambah Voucher Manual -->
-                        <div class="flex items-center gap-2">
-                            <!-- Di-comment out: Pengecekan Cek Semua Validitas ke Telkomsel saat upload bulk -->
-                            <!--
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                class="h-8 gap-1.5 text-xs text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800 hover:bg-sky-50 dark:hover:bg-sky-950/50"
-                                :disabled="scannedRows.length === 0 || isCheckingAll"
-                                @click="checkAllVouchers"
-                            >
-                                <Loader2 v-if="isCheckingAll" class="size-3.5 animate-spin" />
-                                <ScanSearch v-else class="size-3.5" />
-                                <span v-if="isCheckingAll">Mengecek ({{ checkAllProgress.current }}/{{ checkAllProgress.total }})... jeda 2s</span>
-                                <span v-else>Cek Semua Validitas</span>
-                            </Button>
-                            -->
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span v-if="isFetchingDefaults" class="flex items-center gap-1 text-[11px] text-muted-foreground mr-1">
+                                <Loader2 class="size-3 animate-spin text-primary" /> Mendeteksi info paket...
+                            </span>
 
                             <Button
                                 type="button"
@@ -1211,19 +1351,20 @@ function resetAndUploadMore(): void {
                         </div>
                     </div>
 
-                    <!-- Poin 5: Kolom harga jual di pisah jadi 2: Harga Jual Dasar dan Total Harga Jual -->
+                    <!-- Kolom tabel hasil scan: Judul, Deskripsi, No Seri, HRN, Harga Dasar, Total, Format, Aksi -->
                     <div class="overflow-x-auto">
                         <table class="w-full text-xs">
                             <thead class="bg-muted/40 text-left text-muted-foreground border-b">
                                 <tr>
                                     <th class="py-2.5 px-3 font-medium w-10">No</th>
-                                    <th class="py-2.5 px-3 font-medium min-w-[180px]">No. Seri Voucher</th>
-                                    <th class="py-2.5 px-3 font-medium min-w-[200px]">Kode Voucher (HRN)</th>
-                                    <th class="py-2.5 px-3 font-medium min-w-[140px]">Harga Jual Dasar (Rp)</th>
-                                    <th class="py-2.5 px-3 font-medium min-w-[140px]">Total (+{{ fixedMargin }}%)</th>
+                                    <th class="py-2.5 px-3 font-medium min-w-[180px]">Judul Voucher</th>
+                                    <th class="py-2.5 px-3 font-medium min-w-[210px]">Deskripsi Voucher</th>
+                                    <th class="py-2.5 px-3 font-medium min-w-[160px]">No. Seri Voucher</th>
+                                    <th class="py-2.5 px-3 font-medium min-w-[180px]">Kode Voucher (HRN)</th>
+                                    <th class="py-2.5 px-3 font-medium min-w-[130px]">Harga Jual Dasar (Rp)</th>
+                                    <th class="py-2.5 px-3 font-medium min-w-[110px]">Total (+{{ fixedMargin }}%)</th>
                                     <!-- Di-comment out: Kolom Validasi Telkomsel saat upload bulk -->
                                     <!-- <th class="py-2.5 px-3 font-medium min-w-[160px]">Validasi Telkomsel</th> -->
-                                    <th class="py-2.5 px-3 font-medium w-20">Format</th>
                                     <th class="py-2.5 px-3 font-medium w-12 text-center">Aksi</th>
                                 </tr>
                             </thead>
@@ -1244,6 +1385,28 @@ function resetAndUploadMore(): void {
                                 >
                                     <td class="py-2 px-3 font-mono text-muted-foreground">
                                         {{ idx + 1 }}
+                                    </td>
+                                    <!-- Judul Voucher per Baris -->
+                                    <td class="py-2 px-3">
+                                        <Input
+                                            v-model="row.title"
+                                            placeholder="Contoh: Telkomsel 7GB 5 Hari"
+                                            :class="[
+                                                'h-8 text-xs',
+                                                !(row.title || '').trim() ? 'border-destructive focus-visible:ring-destructive' : ''
+                                            ]"
+                                        />
+                                    </td>
+                                    <!-- Deskripsi Voucher per Baris -->
+                                    <td class="py-2 px-3">
+                                        <Input
+                                            v-model="row.description"
+                                            placeholder="Contoh: 7 GB Kuota Internet 5 Hari"
+                                            :class="[
+                                                'h-8 text-xs',
+                                                !(row.description || '').trim() ? 'border-destructive focus-visible:ring-destructive' : ''
+                                            ]"
+                                        />
                                     </td>
                                     <td class="py-2 px-3">
                                         <div class="space-y-1">
@@ -1390,22 +1553,6 @@ function resetAndUploadMore(): void {
                                         </div>
                                     </td>
                                     -->
-                                    <!-- Format Status -->
-                                    <td class="py-2 px-3">
-                                        <span
-                                            v-if="cleanDigits(row.serial_number).length === 12 && cleanDigits(row.hrn).length >= 14 && Number(row.sell_price || 0) > 0"
-                                            class="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400"
-                                        >
-                                            <CheckCircle2 class="size-3.5" /> Siap
-                                        </span>
-                                        <span
-                                            v-else
-                                            class="inline-flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400"
-                                        >
-                                            <AlertCircle class="size-3.5" />
-                                            {{ !cleanDigits(row.serial_number) ? 'SN Kosong' : (cleanDigits(row.serial_number).length !== 12 ? 'SN != 12' : (!cleanDigits(row.hrn) ? 'Kode Kosong' : (Number(row.sell_price || 0) <= 0 ? 'Harga Rp 0' : 'Perlu Cek'))) }}
-                                        </span>
-                                    </td>
                                     <td class="py-2 px-3 text-center">
                                         <Button
                                             type="button"

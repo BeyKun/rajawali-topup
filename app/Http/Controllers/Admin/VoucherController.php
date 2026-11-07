@@ -131,9 +131,11 @@ class VoucherController extends Controller
         $serialNumber = $request->string('serial_number')->toString();
 
         if (Voucher::query()->where('serial_number', $serialNumber)->exists()) {
+            $existing = Voucher::query()->with('product')->where('serial_number', $serialNumber)->first();
+
             return response()->json([
-                'name' => null,
-                'description' => null,
+                'name' => $existing?->product?->name,
+                'description' => $existing?->product?->quota_description,
                 'validity' => null,
                 'expired_date' => null,
                 'region' => null,
@@ -311,6 +313,8 @@ class VoucherController extends Controller
             'rows.*.serial_number' => ['required_with:rows', 'string'],
             'rows.*.hrn' => ['required_with:rows', 'string'],
             'rows.*.sell_price' => ['required_with:rows', 'numeric', 'gt:0'],
+            'rows.*.title' => ['nullable', 'string', 'max:255'],
+            'rows.*.description' => ['nullable', 'string', 'max:1000'],
             'margin_percentage' => ['nullable', 'numeric', 'min:0'],
         ];
 
@@ -378,6 +382,9 @@ class VoucherController extends Controller
                 $hrn = (string) preg_replace('/\s+/', '', trim($rawHrn));
                 $sellPrice = isset($row['sell_price']) && is_numeric($row['sell_price']) ? (float) $row['sell_price'] : 0.0;
 
+                $rawTitle = isset($row['title']) && is_string($row['title']) ? trim($row['title']) : null;
+                $rawDesc = isset($row['description']) && is_string($row['description']) ? trim($row['description']) : null;
+
                 if ($serial !== '' && $hrn !== '') {
                     if ($sellPrice <= 0) {
                         throw ValidationException::withMessages([
@@ -385,11 +392,20 @@ class VoucherController extends Controller
                         ]);
                     }
 
-                    $rows[] = [
+                    $parsedRow = [
                         'serial_number' => $serial,
                         'hrn' => $hrn,
                         'sell_price' => $sellPrice,
                     ];
+
+                    if ($rawTitle !== null && $rawTitle !== '') {
+                        $parsedRow['title'] = $rawTitle;
+                    }
+                    if ($rawDesc !== null && $rawDesc !== '') {
+                        $parsedRow['description'] = $rawDesc;
+                    }
+
+                    $rows[] = $parsedRow;
                 }
             }
 
@@ -448,8 +464,12 @@ class VoucherController extends Controller
             'errors' => [],
         ], now()->addHours(24));
 
-        $title = ! empty($validated['title']) ? trim((string) $validated['title']) : 'Voucher Fisik Telkomsel';
-        $description = ! empty($validated['description']) ? trim((string) $validated['description']) : $title;
+        $title = ! empty($validated['title'])
+            ? trim((string) $validated['title'])
+            : ($rows[0]['title'] ?? 'Voucher Fisik Telkomsel');
+        $description = ! empty($validated['description'])
+            ? trim((string) $validated['description'])
+            : ($rows[0]['description'] ?? $title);
 
         ValidateVoucherBatchJob::dispatch(
             $rows,

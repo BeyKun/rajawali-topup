@@ -206,3 +206,41 @@ test('bulk import groups vouchers by title description and price into products',
         ->and($p30->quota_description)->toBe('10 GB Kuota Utama 30 Hari')
         ->and($p30->vouchers()->count())->toBe(1);
 });
+
+test('bulk import respects per-row title and description from scanned rows', function () {
+    $rows = [
+        [
+            'serial_number' => '300300000001',
+            'hrn' => '1111111111111111',
+            'sell_price' => 20000,
+            'title' => 'Paket A 5GB',
+            'description' => '5 GB Kuota 7 Hari',
+        ],
+        [
+            'serial_number' => '300300000002',
+            'hrn' => '2222222222222222',
+            'sell_price' => 20000,
+            'title' => 'Paket B 10GB',
+            'description' => '10 GB Kuota 30 Hari',
+        ],
+    ];
+
+    $this->actingAs($this->admin)
+        ->post('/admin/vouchers/bulk', [
+            'rows' => $rows,
+            'margin_percentage' => 0,
+        ])
+        ->assertRedirect('/admin/vouchers/bulk');
+
+    expect(Voucher::query()->count())->toBe(2);
+    expect(Product::query()->count())->toBe(2);
+
+    $v1 = Voucher::query()->with('product')->where('serial_number', '300300000001')->first();
+    $v2 = Voucher::query()->with('product')->where('serial_number', '300300000002')->first();
+
+    expect($v1->product->name)->toBe('Paket A 5GB')
+        ->and($v1->product->quota_description)->toBe('5 GB Kuota 7 Hari');
+
+    expect($v2->product->name)->toBe('Paket B 10GB')
+        ->and($v2->product->quota_description)->toBe('10 GB Kuota 30 Hari');
+});
