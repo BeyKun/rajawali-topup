@@ -523,7 +523,7 @@ bulk.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
     bulk.form = bulkForm
 /**
 * @see \App\Http\Controllers\Admin\VoucherController::bulkStore
- * @see app/Http/Controllers/Admin/VoucherController.php:362
+ * @see app/Http/Controllers/Admin/VoucherController.php:380
  * @route '/admin/vouchers/bulk'
  */
 export const bulkStore = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -538,7 +538,7 @@ bulkStore.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\VoucherController::bulkStore
- * @see app/Http/Controllers/Admin/VoucherController.php:362
+ * @see app/Http/Controllers/Admin/VoucherController.php:380
  * @route '/admin/vouchers/bulk'
  */
 bulkStore.url = (options?: RouteQueryOptions) => {
@@ -547,7 +547,7 @@ bulkStore.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\Admin\VoucherController::bulkStore
- * @see app/Http/Controllers/Admin/VoucherController.php:362
+ * @see app/Http/Controllers/Admin/VoucherController.php:380
  * @route '/admin/vouchers/bulk'
  */
 bulkStore.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -557,7 +557,7 @@ bulkStore.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
 
     /**
 * @see \App\Http\Controllers\Admin\VoucherController::bulkStore
- * @see app/Http/Controllers/Admin/VoucherController.php:362
+ * @see app/Http/Controllers/Admin/VoucherController.php:380
  * @route '/admin/vouchers/bulk'
  */
     const bulkStoreForm = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -567,7 +567,7 @@ bulkStore.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
 
             /**
 * @see \App\Http\Controllers\Admin\VoucherController::bulkStore
- * @see app/Http/Controllers/Admin/VoucherController.php:362
+ * @see app/Http/Controllers/Admin/VoucherController.php:380
  * @route '/admin/vouchers/bulk'
  */
         bulkStoreForm.post = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -578,7 +578,7 @@ bulkStore.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
     bulkStore.form = bulkStoreForm
 /**
 * @see \App\Http\Controllers\Admin\VoucherController::batchStatus
- * @see app/Http/Controllers/Admin/VoucherController.php:567
+ * @see app/Http/Controllers/Admin/VoucherController.php:585
  * @route '/admin/vouchers/batch/{batchId}'
  */
 export const batchStatus = (args: { batchId: string | number } | [batchId: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -593,7 +593,7 @@ batchStatus.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\VoucherController::batchStatus
- * @see app/Http/Controllers/Admin/VoucherController.php:567
+ * @see app/Http/Controllers/Admin/VoucherController.php:585
  * @route '/admin/vouchers/batch/{batchId}'
  */
 batchStatus.url = (args: { batchId: string | number } | [batchId: string | number ] | string | number, options?: RouteQueryOptions) => {
@@ -621,7 +621,7 @@ batchStatus.url = (args: { batchId: string | number } | [batchId: string | numbe
 
 /**
 * @see \App\Http\Controllers\Admin\VoucherController::batchStatus
- * @see app/Http/Controllers/Admin/VoucherController.php:567
+ * @see app/Http/Controllers/Admin/VoucherController.php:585
  * @route '/admin/vouchers/batch/{batchId}'
  */
 batchStatus.get = (args: { batchId: string | number } | [batchId: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -630,7 +630,7 @@ batchStatus.get = (args: { batchId: string | number } | [batchId: string | numbe
 })
 /**
 * @see \App\Http\Controllers\Admin\VoucherController::batchStatus
- * @see app/Http/Controllers/Admin/VoucherController.php:567
+ * @see app/Http/Controllers/Admin/VoucherController.php:585
  * @route '/admin/vouchers/batch/{batchId}'
  */
 batchStatus.head = (args: { batchId: string | number } | [batchId: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'head'> => ({
@@ -640,7 +640,7 @@ batchStatus.head = (args: { batchId: string | number } | [batchId: string | numb
 
     /**
 * @see \App\Http\Controllers\Admin\VoucherController::batchStatus
- * @see app/Http/Controllers/Admin/VoucherController.php:567
+ * @see app/Http/Controllers/Admin/VoucherController.php:585
  * @route '/admin/vouchers/batch/{batchId}'
  */
     const batchStatusForm = (args: { batchId: string | number } | [batchId: string | number ] | string | number, options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -650,7 +650,7 @@ batchStatus.head = (args: { batchId: string | number } | [batchId: string | numb
 
             /**
 * @see \App\Http\Controllers\Admin\VoucherController::batchStatus
- * @see app/Http/Controllers/Admin/VoucherController.php:567
+ * @see app/Http/Controllers/Admin/VoucherController.php:585
  * @route '/admin/vouchers/batch/{batchId}'
  */
         batchStatusForm.get = (args: { batchId: string | number } | [batchId: string | number ] | string | number, options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -659,7 +659,7 @@ batchStatus.head = (args: { batchId: string | number } | [batchId: string | numb
         })
             /**
 * @see \App\Http\Controllers\Admin\VoucherController::batchStatus
- * @see app/Http/Controllers/Admin/VoucherController.php:567
+ * @see app/Http/Controllers/Admin/VoucherController.php:585
  * @route '/admin/vouchers/batch/{batchId}'
  */
         batchStatusForm.head = (args: { batchId: string | number } | [batchId: string | number ] | string | number, options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -675,7 +675,7 @@ batchStatus.head = (args: { batchId: string | number } | [batchId: string | numb
     batchStatus.form = batchStatusForm
 /**
 * @see \App\Http\Controllers\Admin\VoucherController::latestBatchStatus
- * @see app/Http/Controllers/Admin/VoucherController.php:584
+ * @see app/Http/Controllers/Admin/VoucherController.php:602
  * @route '/admin/vouchers/latest-batch'
  */
 export const latestBatchStatus = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -690,7 +690,7 @@ latestBatchStatus.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\VoucherController::latestBatchStatus
- * @see app/Http/Controllers/Admin/VoucherController.php:584
+ * @see app/Http/Controllers/Admin/VoucherController.php:602
  * @route '/admin/vouchers/latest-batch'
  */
 latestBatchStatus.url = (options?: RouteQueryOptions) => {
@@ -699,7 +699,7 @@ latestBatchStatus.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\Admin\VoucherController::latestBatchStatus
- * @see app/Http/Controllers/Admin/VoucherController.php:584
+ * @see app/Http/Controllers/Admin/VoucherController.php:602
  * @route '/admin/vouchers/latest-batch'
  */
 latestBatchStatus.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -708,7 +708,7 @@ latestBatchStatus.get = (options?: RouteQueryOptions): RouteDefinition<'get'> =>
 })
 /**
 * @see \App\Http\Controllers\Admin\VoucherController::latestBatchStatus
- * @see app/Http/Controllers/Admin/VoucherController.php:584
+ * @see app/Http/Controllers/Admin/VoucherController.php:602
  * @route '/admin/vouchers/latest-batch'
  */
 latestBatchStatus.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
@@ -718,7 +718,7 @@ latestBatchStatus.head = (options?: RouteQueryOptions): RouteDefinition<'head'> 
 
     /**
 * @see \App\Http\Controllers\Admin\VoucherController::latestBatchStatus
- * @see app/Http/Controllers/Admin/VoucherController.php:584
+ * @see app/Http/Controllers/Admin/VoucherController.php:602
  * @route '/admin/vouchers/latest-batch'
  */
     const latestBatchStatusForm = (options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -728,7 +728,7 @@ latestBatchStatus.head = (options?: RouteQueryOptions): RouteDefinition<'head'> 
 
             /**
 * @see \App\Http\Controllers\Admin\VoucherController::latestBatchStatus
- * @see app/Http/Controllers/Admin/VoucherController.php:584
+ * @see app/Http/Controllers/Admin/VoucherController.php:602
  * @route '/admin/vouchers/latest-batch'
  */
         latestBatchStatusForm.get = (options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -737,7 +737,7 @@ latestBatchStatus.head = (options?: RouteQueryOptions): RouteDefinition<'head'> 
         })
             /**
 * @see \App\Http\Controllers\Admin\VoucherController::latestBatchStatus
- * @see app/Http/Controllers/Admin/VoucherController.php:584
+ * @see app/Http/Controllers/Admin/VoucherController.php:602
  * @route '/admin/vouchers/latest-batch'
  */
         latestBatchStatusForm.head = (options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({

@@ -348,11 +348,29 @@ class VoucherController extends Controller
 
         $userId = $request->user()?->id;
 
+        $cityIds = $request->user()?->isKabupatenAdmin() ? $request->user()->managedCityIds() : null;
+
+        $products = Product::query()
+            ->when(! empty($cityIds), fn (Builder $q) => $q->where(fn (Builder $inner) => $inner
+                ->whereIn('city_id', $cityIds)
+                ->orWhereNull('city_id')
+            ))
+            ->orderBy('name')
+            ->get(['id', 'name', 'quota_description', 'sell_price', 'hpp_price'])
+            ->map(fn (Product $p): array => [
+                'id' => $p->id,
+                'name' => $p->name,
+                'quota_description' => $p->quota_description,
+                'sell_price' => (float) $p->sell_price,
+                'hpp_price' => (float) $p->hpp_price,
+            ]);
+
         return Inertia::render('admin/vouchers/Bulk', [
             'is_super_admin' => $isSuperAdmin,
             'cities' => $cities,
             'default_margin' => (float) config('voucher.default_margin', 2.0),
             'latest_batch' => $userId ? Cache::get("voucher_batch_latest_{$userId}") : null,
+            'products' => $products,
         ]);
     }
 

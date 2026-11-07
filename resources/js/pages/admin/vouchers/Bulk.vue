@@ -4,24 +4,30 @@ import {
     AlertCircle,
     ArrowLeft,
     Camera,
+    Check,
     CheckCheck,
     CheckCircle2,
+    ChevronDown,
     DollarSign,
     Download,
     FileSpreadsheet,
     FileUp,
     ImageIcon,
     Loader2,
+    Pencil,
     Plus,
     RefreshCw,
     ScanSearch,
+    Search,
     Sparkles,
+    Tag,
     Trash2,
     UploadCloud,
     Wand2,
     X,
 } from '@lucide/vue';
-import { computed, ref } from 'vue';
+import { onClickOutside } from '@vueuse/core';
+import { computed, nextTick, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
@@ -51,6 +57,7 @@ import {
     formatSerialNumber,
     handleFormattedInput,
 } from '@/lib/voucherFormat';
+import type { ProductCatalogOption } from '@/types';
 
 defineOptions({
     layout: {
@@ -79,6 +86,7 @@ const props = defineProps<{
     cities?: CityOption[];
     default_margin?: number;
     latest_batch?: LatestBatchData | null;
+    products?: ProductCatalogOption[];
 }>();
 
 const fixedMargin = computed(() => props.default_margin ?? 2);
@@ -130,6 +138,110 @@ function applyBulkPrice(): void {
     });
     showSetPriceDialog.value = false;
     toast.success(`Harga dasar Rp ${formatThousands(parsed)} diterapkan ke semua voucher.`);
+}
+
+// 1b. Set Satu Judul & Deskripsi Voucher Modal
+const showSetTitleDescDialog = ref(false);
+const bulkTitleInput = ref('');
+const bulkDescInput = ref('');
+const bulkTitleError = ref('');
+const selectedCatalogOption = ref('manual');
+const isCatalogSelectOpen = ref(false);
+const catalogSelectRef = ref<HTMLElement | null>(null);
+const catalogSearchInputRef = ref<HTMLInputElement | null>(null);
+const catalogSearchQuery = ref('');
+
+onClickOutside(catalogSelectRef, () => {
+    isCatalogSelectOpen.value = false;
+});
+
+function toggleCatalogSelect(): void {
+    isCatalogSelectOpen.value = !isCatalogSelectOpen.value;
+    if (isCatalogSelectOpen.value) {
+        catalogSearchQuery.value = '';
+        nextTick(() => {
+            catalogSearchInputRef.value?.focus();
+        });
+    }
+}
+
+function formatCatalogLabel(product: ProductCatalogOption): string {
+    const desc = product.quota_description ? ` — ${product.quota_description}` : '';
+    const full = `${product.name}${desc}`;
+    return full.length > 55 ? `${full.slice(0, 52)}...` : full;
+}
+
+const filteredCatalogProducts = computed(() => {
+    const q = catalogSearchQuery.value.trim().toLowerCase();
+    if (!q) return props.products || [];
+    return (props.products || []).filter((p) => {
+        return (
+            p.name.toLowerCase().includes(q) ||
+            (p.quota_description || '').toLowerCase().includes(q)
+        );
+    });
+});
+
+const selectedCatalogDisplayLabel = computed(() => {
+    if (selectedCatalogOption.value === 'manual') {
+        return 'Edit Manual';
+    }
+    const product = props.products?.find((p) => String(p.id) === selectedCatalogOption.value);
+    if (product) {
+        return formatCatalogLabel(product);
+    }
+    return 'Pilih Paket atau Edit Manual';
+});
+
+function selectCatalogOption(val: string): void {
+    selectedCatalogOption.value = val;
+    isCatalogSelectOpen.value = false;
+    if (val !== 'manual') {
+        const product = props.products?.find((p) => String(p.id) === val);
+        if (product) {
+            bulkTitleInput.value = product.name;
+            bulkDescInput.value = product.quota_description;
+            bulkTitleError.value = '';
+        }
+    }
+}
+
+function openSetTitleDescDialog(): void {
+    const first = scannedRows.value[0];
+    bulkTitleInput.value = first?.title || '';
+    bulkDescInput.value = first?.description || '';
+    bulkTitleError.value = '';
+    isCatalogSelectOpen.value = false;
+    catalogSearchQuery.value = '';
+
+    const match = props.products?.find(
+        (p) => p.name === bulkTitleInput.value && p.quota_description === bulkDescInput.value,
+    );
+    if (match) {
+        selectedCatalogOption.value = String(match.id);
+    } else {
+        selectedCatalogOption.value = 'manual';
+    }
+
+    showSetTitleDescDialog.value = true;
+}
+
+function applyBulkTitleDesc(): void {
+    const title = bulkTitleInput.value.trim();
+    if (!title) {
+        bulkTitleError.value = 'Judul voucher tidak boleh kosong.';
+        return;
+    }
+    const desc = bulkDescInput.value.trim() || title;
+    bulkTitleError.value = '';
+
+    scannedRows.value.forEach((r) => {
+        r.title = title;
+        r.description = desc;
+    });
+
+    showSetTitleDescDialog.value = false;
+    toast.success(`Judul & deskripsi berhasil diterapkan ke semua (${scannedRows.value.length}) voucher.`);
 }
 
 // 2. Download Template Modal
@@ -1343,6 +1455,17 @@ function resetAndUploadMore(): void {
                                 variant="outline"
                                 size="sm"
                                 class="h-8 gap-1.5 text-xs"
+                                @click="openSetTitleDescDialog"
+                            >
+                                <Tag class="size-3.5" />
+                                Set Satu Judul Voucher
+                            </Button>
+
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                class="h-8 gap-1.5 text-xs"
                                 @click="addManualRow"
                             >
                                 <Plus class="size-3.5" />
@@ -1756,6 +1879,168 @@ function resetAndUploadMore(): void {
                     Batal
                 </Button>
                 <Button :disabled="parseThousands(bulkPriceInput) <= 0" @click="applyBulkPrice">
+                    Terapkan ke Semua Baris
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
+
+    <!-- =================================================================== -->
+    <!-- MODAL 1B: SET SATU JUDUL & DESKRIPSI VOUCHER -->
+    <!-- =================================================================== -->
+    <Dialog v-model:open="showSetTitleDescDialog">
+        <DialogContent class="sm:max-w-lg">
+            <DialogHeader>
+                <DialogTitle class="flex items-center gap-2">
+                    <Tag class="size-5 text-primary" />
+                    Set Satu Judul & Deskripsi Voucher
+                </DialogTitle>
+                <DialogDescription>
+                    Pilih dari katalog paket atau masukkan judul & deskripsi manual untuk diterapkan ke seluruh baris voucher hasil scan sekaligus.
+                </DialogDescription>
+            </DialogHeader>
+
+            <div class="space-y-4 py-2">
+                <!-- Dropdown Searchable Katalog Paket / Edit Manual -->
+                <div class="grid gap-2">
+                    <Label for="bulk_catalog_select">Katalog Paket (Judul & Deskripsi)</Label>
+                    <div ref="catalogSelectRef" class="relative">
+                        <button
+                            type="button"
+                            id="bulk_catalog_select"
+                            class="border-input focus-visible:border-ring focus-visible:ring-ring/50 flex h-9 w-full min-w-0 items-center justify-between gap-2 rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs transition-colors focus-visible:ring-[3px] focus-visible:outline-none"
+                            @click="toggleCatalogSelect"
+                        >
+                            <span
+                                v-if="selectedCatalogOption === 'manual'"
+                                class="flex min-w-0 items-center gap-2 font-medium text-primary"
+                            >
+                                <Pencil class="size-4 shrink-0" />
+                                <span class="truncate">Edit Manual</span>
+                            </span>
+                            <span
+                                v-else
+                                class="min-w-0 truncate text-left"
+                                :class="{ 'text-muted-foreground': !selectedCatalogOption }"
+                                :title="bulkTitleInput ? `${bulkTitleInput} — ${bulkDescInput}` : ''"
+                            >
+                                {{ selectedCatalogDisplayLabel }}
+                            </span>
+                            <ChevronDown
+                                class="size-4 shrink-0 opacity-50 transition-transform"
+                                :class="{ 'rotate-180': isCatalogSelectOpen }"
+                            />
+                        </button>
+
+                        <!-- Dropdown Menu / Popover -->
+                        <div
+                            v-if="isCatalogSelectOpen"
+                            class="bg-popover text-popover-foreground absolute z-50 mt-1 max-h-72 w-full rounded-md border shadow-md outline-none animate-in fade-in-0 zoom-in-95"
+                        >
+                            <!-- Search Input -->
+                            <div class="border-b p-2">
+                                <div class="relative flex items-center">
+                                    <Search class="text-muted-foreground absolute left-2.5 size-4" />
+                                    <input
+                                        ref="catalogSearchInputRef"
+                                        v-model="catalogSearchQuery"
+                                        type="text"
+                                        placeholder="Cari nama paket atau kuota..."
+                                        class="border-input bg-background focus:ring-ring h-8 w-full rounded-md border pl-8 pr-7 text-xs focus:ring-1 focus:outline-none"
+                                    />
+                                    <button
+                                        v-if="catalogSearchQuery"
+                                        type="button"
+                                        class="text-muted-foreground hover:text-foreground absolute right-2"
+                                        @click="catalogSearchQuery = ''"
+                                    >
+                                        <X class="size-3.5" />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Options List -->
+                            <div class="max-h-56 overflow-y-auto p-1 text-sm">
+                                <!-- Option: Edit Manual -->
+                                <button
+                                    type="button"
+                                    class="hover:bg-accent hover:text-accent-foreground flex w-full cursor-pointer items-center justify-between gap-2 rounded-sm px-2.5 py-1.5 text-left text-sm font-medium text-primary"
+                                    @click="selectCatalogOption('manual')"
+                                >
+                                    <div class="flex items-center gap-2">
+                                        <Pencil class="size-4 shrink-0 text-primary" />
+                                        <span>Edit Manual</span>
+                                    </div>
+                                    <Check
+                                        v-if="selectedCatalogOption === 'manual'"
+                                        class="size-4 shrink-0 text-primary"
+                                    />
+                                </button>
+
+                                <div class="my-1 border-t"></div>
+
+                                <!-- List of filtered products -->
+                                <div
+                                    v-if="filteredCatalogProducts.length === 0"
+                                    class="py-4 text-center text-xs text-muted-foreground"
+                                >
+                                    Tidak ada paket yang cocok dengan "{{ catalogSearchQuery }}"
+                                </div>
+                                <button
+                                    v-for="product in filteredCatalogProducts"
+                                    :key="product.id"
+                                    type="button"
+                                    class="hover:bg-accent hover:text-accent-foreground flex w-full min-w-0 cursor-pointer items-center justify-between gap-2 rounded-sm px-2.5 py-1.5 text-left text-sm"
+                                    :title="`${product.name} — ${product.quota_description}`"
+                                    @click="selectCatalogOption(String(product.id))"
+                                >
+                                    <span class="min-w-0 flex-1 truncate">
+                                        {{ formatCatalogLabel(product) }}
+                                    </span>
+                                    <Check
+                                        v-if="selectedCatalogOption === String(product.id)"
+                                        class="size-4 shrink-0 text-primary"
+                                    />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Input Judul Voucher -->
+                <div class="grid gap-2">
+                    <Label for="modal-bulk-title">Judul Voucher</Label>
+                    <Input
+                        id="modal-bulk-title"
+                        v-model="bulkTitleInput"
+                        placeholder="Contoh: Telkomsel 7GB 5 Hari"
+                        :class="[bulkTitleError ? 'border-destructive focus-visible:ring-destructive' : '']"
+                        @input="bulkTitleError = ''"
+                    />
+                    <p v-if="bulkTitleError" class="text-xs text-destructive">
+                        {{ bulkTitleError }}
+                    </p>
+                </div>
+
+                <!-- Input Deskripsi Voucher -->
+                <div class="grid gap-2">
+                    <Label for="modal-bulk-desc">Deskripsi Voucher</Label>
+                    <textarea
+                        id="modal-bulk-desc"
+                        :value="bulkDescInput"
+                        rows="2"
+                        placeholder="Contoh: 7 GB Kuota Internet Nasional 5 Hari"
+                        class="border-input focus-visible:ring-ring w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs focus-visible:ring-2 focus-visible:outline-none"
+                        @input="bulkDescInput = ($event.target as HTMLTextAreaElement).value"
+                    ></textarea>
+                </div>
+            </div>
+
+            <DialogFooter class="gap-2 sm:gap-0">
+                <Button variant="outline" @click="showSetTitleDescDialog = false">
+                    Batal
+                </Button>
+                <Button :disabled="!bulkTitleInput.trim()" @click="applyBulkTitleDesc">
                     Terapkan ke Semua Baris
                 </Button>
             </DialogFooter>
