@@ -99,8 +99,12 @@ class VoucherController extends Controller
                 ->whereIn('city_id', $cityIds)
                 ->orWhereNull('city_id')
             ))
+            ->withCount('vouchers')
+            ->orderByDesc('vouchers_count')
             ->orderBy('name')
             ->get(['id', 'name', 'quota_description', 'sell_price', 'hpp_price'])
+            ->unique(fn (Product $p): string => $p->name.'|'.$p->quota_description)
+            ->values()
             ->map(fn (Product $p): array => [
                 'id' => $p->id,
                 'name' => $p->name,
@@ -270,92 +274,47 @@ class VoucherController extends Controller
             ? trim((string) $request->input('description'))
             : ($voucher->product?->quota_description ?: $title);
 
-        $isSharedProduct = $voucher->product_id !== null && Voucher::query()
-            ->where('product_id', $voucher->product_id)
-            ->where('id', '!=', $voucher->id)
-            ->exists();
-
         $currentProduct = $voucher->product;
-        $requestedProductId = $request->filled('product_id') ? (int) $request->input('product_id') : null;
-        $selectedCatalog = $requestedProductId !== null
-            ? Product::query()
-                ->whereKey($requestedProductId)
-                ->where('name', $title)
-                ->where('quota_description', $description)
-                ->first()
-            : null;
 
-        $isCatalogTextChanged = $currentProduct === null
-            || $currentProduct->name !== $title
-            || $currentProduct->quota_description !== $description;
+        // Cari katalog yang sudah ada dengan kombinasi nama, deskripsi, dan harga jual yang sama,
+        // diurutkan berdasarkan jumlah voucher terbanyak (atau katalog paling awal).
+        $matchingProductByPrice = Product::query()
+            ->where('name', $title)
+            ->where('quota_description', $description)
+            ->where('sell_price', $finalSellPrice)
+            ->when(
+                $voucher->city_id !== null,
+                fn (Builder $q) => $q->where(fn (Builder $inner) => $inner
+                    ->where('city_id', $voucher->city_id)
+                    ->orWhereNull('city_id')),
+                fn (Builder $q) => $q->whereNull('city_id')
+            )
+            ->withCount('vouchers')
+            ->orderByDesc('vouchers_count')
+            ->orderBy('id')
+            ->first();
 
-        if ($selectedCatalog !== null && $selectedCatalog->id !== $voucher->product_id) {
-            $voucher->product_id = $selectedCatalog->id;
-        } elseif ($isCatalogTextChanged) {
-            $existingTarget = $selectedCatalog ?? Product::query()
-                ->where('name', $title)
-                ->where('quota_description', $description)
-                ->when(
-                    $voucher->city_id !== null,
-                    fn (Builder $q) => $q->where(fn (Builder $inner) => $inner
-                        ->where('city_id', $voucher->city_id)
-                        ->orWhereNull('city_id')),
-                    fn (Builder $q) => $q->whereNull('city_id')
-                )
-                ->orderByRaw('CASE WHEN sell_price = ? THEN 0 ELSE 1 END', [$finalSellPrice])
-                ->first();
+        if ($matchingProductByPrice !== null) {
+            $voucher->product_id = $matchingProductByPrice->id;
+        } else {
+            $checkData = [
+                'name' => $title,
+                'description' => $description,
+                'validity' => (string) ($voucher->validity ?? ''),
+                'region' => (string) ($voucher->region ?: ($currentProduct?->region ?: '')),
+                'serial_number' => $voucher->serial_number,
+            ];
 
-            if ($existingTarget !== null) {
-                $voucher->product_id = $existingTarget->id;
-            } else {
-                $checkData = [
-                    'name' => $title,
-                    'description' => $description,
-                    'validity' => (string) ($voucher->validity ?? ''),
-                    'region' => (string) ($voucher->region ?: ($currentProduct?->region ?: '')),
-                    'serial_number' => $voucher->serial_number,
-                ];
+            $newProduct = $this->inventory->resolveProduct(
+                $checkData,
+                $finalSellPrice,
+                $voucher->city_id,
+                $basePrice,
+                $title,
+                $description
+            );
 
-                $newProduct = $this->inventory->resolveProduct(
-                    $checkData,
-                    $finalSellPrice,
-                    $voucher->city_id,
-                    $basePrice,
-                    $title,
-                    $description
-                );
-
-                $voucher->product_id = $newProduct->id;
-            }
-        } elseif ($isSharedProduct) {
-            $isPriceChanged = (float) $currentProduct->sell_price !== $finalSellPrice
-                || (float) $currentProduct->hpp_price !== $basePrice;
-
-            if ($isPriceChanged) {
-                $checkData = [
-                    'name' => $title,
-                    'description' => $description,
-                    'validity' => (string) ($voucher->validity ?? ''),
-                    'region' => (string) ($voucher->region ?: ($currentProduct->region ?: '')),
-                    'serial_number' => $voucher->serial_number,
-                ];
-
-                $newProduct = $this->inventory->resolveProduct(
-                    $checkData,
-                    $finalSellPrice,
-                    $voucher->city_id,
-                    $basePrice,
-                    $title,
-                    $description
-                );
-
-                $voucher->product_id = $newProduct->id;
-            }
-        } elseif ($currentProduct !== null) {
-            $currentProduct->update([
-                'sell_price' => $finalSellPrice,
-                'hpp_price' => $basePrice,
-            ]);
+            $voucher->product_id = $newProduct->id;
         }
 
         $voucher->save();
@@ -413,8 +372,12 @@ class VoucherController extends Controller
                 ->whereIn('city_id', $cityIds)
                 ->orWhereNull('city_id')
             ))
+            ->withCount('vouchers')
+            ->orderByDesc('vouchers_count')
             ->orderBy('name')
             ->get(['id', 'name', 'quota_description', 'sell_price', 'hpp_price'])
+            ->unique(fn (Product $p): string => $p->name.'|'.$p->quota_description)
+            ->values()
             ->map(fn (Product $p): array => [
                 'id' => $p->id,
                 'name' => $p->name,

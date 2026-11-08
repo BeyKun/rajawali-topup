@@ -179,3 +179,73 @@ test('editing a voucher to a new catalog and then back to the original catalog l
         ->and($catalogB->quota_description)->toBe('Deskripsi Baru 15GB')
         ->and($catalogB->vouchers()->count())->toBe(0);
 });
+
+test('editing a voucher price to a new price and then back to the previous price regroups it into the existing catalog with the most vouchers', function () {
+    $catalogA = Product::factory()->create([
+        'name' => 'Paket Internet 10GB',
+        'quota_description' => 'Kuota Utama 10GB',
+        'hpp_price' => 20000,
+        'sell_price' => 20400,
+        'city_id' => null,
+    ]);
+
+    $voucher1 = Voucher::factory()->create([
+        'product_id' => $catalogA->id,
+        'serial_number' => '998877665501',
+        'status' => VoucherStatus::Available,
+        'city_id' => null,
+    ]);
+
+    $voucher2 = Voucher::factory()->create([
+        'product_id' => $catalogA->id,
+        'serial_number' => '998877665502',
+        'status' => VoucherStatus::Available,
+        'city_id' => null,
+    ]);
+
+    // Step 1: Change voucher1 price from 20000 -> 25000 (final 25500) -> creates Catalog B
+    $this->actingAs($this->admin)
+        ->put("/admin/vouchers/{$voucher1->serial_number}", [
+            'product_id' => $catalogA->id,
+            'title' => $catalogA->name,
+            'description' => $catalogA->quota_description,
+            'serial_number' => $voucher1->serial_number,
+            'status' => VoucherStatus::Available->value,
+            'sell_price' => 25000,
+            'margin_percentage' => 2,
+            'city_ids' => [],
+        ])
+        ->assertRedirect();
+
+    $voucher1->refresh();
+    $catalogB = Product::find($voucher1->product_id);
+
+    expect($catalogB)->not->toBeNull()
+        ->and($catalogB->id)->not->toBe($catalogA->id)
+        ->and((float) $catalogB->sell_price)->toBe(25500.0)
+        ->and($catalogB->vouchers()->count())->toBe(1)
+        ->and($catalogA->vouchers()->count())->toBe(1);
+
+    // Step 2: Change voucher1 price back from 25000 -> 20000 (final 20400)
+    $this->actingAs($this->admin)
+        ->put("/admin/vouchers/{$voucher1->serial_number}", [
+            'product_id' => $catalogB->id,
+            'title' => $catalogB->name,
+            'description' => $catalogB->quota_description,
+            'serial_number' => $voucher1->serial_number,
+            'status' => VoucherStatus::Available->value,
+            'sell_price' => 20000,
+            'margin_percentage' => 2,
+            'city_ids' => [],
+        ])
+        ->assertRedirect();
+
+    $voucher1->refresh();
+    $catalogB->refresh();
+
+    // Voucher 1 is grouped back into Catalog A (20400), and Catalog B stays at 25500 with 0 vouchers
+    expect($voucher1->product_id)->toBe($catalogA->id)
+        ->and($catalogA->vouchers()->count())->toBe(2)
+        ->and((float) $catalogB->sell_price)->toBe(25500.0)
+        ->and($catalogB->vouchers()->count())->toBe(0);
+});

@@ -192,19 +192,21 @@ class VoucherInventoryService
         $description = ! empty($customDescription) ? trim($customDescription) : ($check['description'] !== '' ? $check['description'] : $name);
         $slug = $this->deriveProductSlug($name, $description, $check, $cityId, $sellPrice);
 
-        $product = Product::query()->firstOrNew(['slug' => $slug]);
+        $existingByName = Product::query()
+            ->where('name', $name)
+            ->where('quota_description', $description)
+            ->where('city_id', $cityId)
+            ->when($sellPrice !== null, fn ($q) => $q->where('sell_price', $sellPrice))
+            ->withCount('vouchers')
+            ->orderByDesc('vouchers_count')
+            ->orderBy('id')
+            ->first();
 
-        if (! $product->exists) {
-            $existingByName = Product::query()
-                ->where('name', $name)
-                ->where('quota_description', $description)
-                ->where('city_id', $cityId)
-                ->when($sellPrice !== null, fn ($q) => $q->where('sell_price', $sellPrice))
-                ->first();
-
-            if ($existingByName !== null) {
-                $product = $existingByName;
-            }
+        if ($existingByName !== null) {
+            unset($existingByName->vouchers_count);
+            $product = $existingByName;
+        } else {
+            $product = Product::query()->firstOrNew(['slug' => $slug]);
         }
 
         $product->name = $name;
