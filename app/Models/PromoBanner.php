@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Events\CatalogUpdated;
 use Database\Factories\PromoBannerFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -27,6 +28,12 @@ class PromoBanner extends Model
 {
     /** @use HasFactory<PromoBannerFactory> */
     use HasFactory;
+
+    protected static function booted(): void
+    {
+        static::saved(fn () => CatalogUpdated::dispatchSafely('banner_saved'));
+        static::deleted(fn () => CatalogUpdated::dispatchSafely('banner_deleted'));
+    }
 
     /**
      * Get the attributes that should be cast.

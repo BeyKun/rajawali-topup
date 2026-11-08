@@ -59,19 +59,6 @@ Route::middleware(['auth', 'verified', 'admin'])
         Route::put('outlets/{user}', [OutletUserController::class, 'update'])->name('outlets.update');
         Route::post('outlets/{user}/reset-password', [OutletUserController::class, 'resetPassword'])->name('outlets.reset-password');
 
-        Route::get('promos', [PromoController::class, 'index'])->name('promos.index');
-
-        Route::prefix('promos/banners')->name('promos.banners.')->group(function (): void {
-            Route::post('/', [PromoBannerController::class, 'store'])->name('store');
-            Route::post('{banner}', [PromoBannerController::class, 'update'])->name('update');
-            Route::delete('{banner}', [PromoBannerController::class, 'destroy'])->name('destroy');
-        });
-        Route::prefix('promos/vouchers')->name('promos.vouchers.')->group(function (): void {
-            Route::post('/', [PromoVoucherController::class, 'store'])->name('store');
-            Route::put('{voucher}', [PromoVoucherController::class, 'update'])->name('update');
-            Route::delete('{voucher}', [PromoVoucherController::class, 'destroy'])->name('destroy');
-        });
-
         Route::get('orders', [OrderController::class, 'index'])->name('orders.index');
         Route::get('orders/{order}', [OrderController::class, 'show'])->name('orders.show');
         Route::post('orders/{order}/retry-redeem', [OrderController::class, 'retryRedeem'])->name('orders.retry-redeem');
@@ -86,6 +73,19 @@ Route::middleware(['auth', 'verified', 'admin'])
         });
 
         Route::middleware('super_admin')->group(function (): void {
+            Route::get('promos', [PromoController::class, 'index'])->name('promos.index');
+
+            Route::prefix('promos/banners')->name('promos.banners.')->group(function (): void {
+                Route::post('/', [PromoBannerController::class, 'store'])->name('store');
+                Route::post('{banner}', [PromoBannerController::class, 'update'])->name('update');
+                Route::delete('{banner}', [PromoBannerController::class, 'destroy'])->name('destroy');
+            });
+            Route::prefix('promos/vouchers')->name('promos.vouchers.')->group(function (): void {
+                Route::post('/', [PromoVoucherController::class, 'store'])->name('store');
+                Route::put('{voucher}', [PromoVoucherController::class, 'update'])->name('update');
+                Route::delete('{voucher}', [PromoVoucherController::class, 'destroy'])->name('destroy');
+            });
+
             Route::get('admins', [KabupatenAdminController::class, 'index'])->name('admins.index');
             Route::post('admins', [KabupatenAdminController::class, 'store'])->name('admins.store');
             Route::put('admins/{admin}', [KabupatenAdminController::class, 'update'])->name('admins.update');

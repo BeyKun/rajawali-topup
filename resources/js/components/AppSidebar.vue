@@ -110,11 +110,15 @@ const mainNavItems = computed<NavItem[]>(() => {
                         : undefined,
                 badgeVariant: 'destructive',
             },
-            {
-                title: 'Promo',
-                href: '/admin/promos',
-                icon: BadgePercent,
-            },
+            ...(isSuperAdmin.value
+                ? [
+                      {
+                          title: 'Promo',
+                          href: '/admin/promos',
+                          icon: BadgePercent,
+                      },
+                  ]
+                : []),
             {
                 title: 'Katalog Paket',
                 href: '/admin/products',

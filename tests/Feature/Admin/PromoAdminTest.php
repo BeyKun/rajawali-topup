@@ -330,3 +330,11 @@ test('guests cannot manage promo banners or vouchers', function () {
     $this->delete("/admin/promos/banners/{$banner->id}")->assertRedirect('/login');
     $this->delete("/admin/promos/vouchers/{$voucher->id}")->assertRedirect('/login');
 });
+
+test('non-super admins cannot access promo management', function () {
+    $operator = User::factory()->operator()->create();
+
+    $this->actingAs($operator)->get('/admin/promos')->assertForbidden();
+    $this->actingAs($operator)->post('/admin/promos/banners', [])->assertForbidden();
+    $this->actingAs($operator)->post('/admin/promos/vouchers', [])->assertForbidden();
+});

@@ -46,7 +46,7 @@ const props = defineProps<{
     discountTypes: DiscountType[];
 }>();
 
-const activeTab = ref<'banners' | 'popups' | 'vouchers'>('banners');
+const activeTab = ref<'banners' | 'popups' | 'vouchers'>('popups');
 
 const sliderBanners = computed(() => props.banners.filter((b) => !b.is_featured));
 const popupBanners = computed(() => props.banners.filter((b) => b.is_featured));
@@ -237,21 +237,7 @@ function destroyVoucher(voucher: AdminPromoVoucher): void {
 
         <!-- Tabs -->
         <div class="flex gap-2 border-b">
-            <button
-                type="button"
-                class="border-b-2 px-4 py-2 text-sm font-medium transition"
-                :class="
-                    activeTab === 'banners'
-                        ? 'border-primary text-foreground'
-                        : 'border-transparent text-muted-foreground hover:text-foreground'
-                "
-                @click="activeTab = 'banners'"
-            >
-                <ImageIcon class="mr-1.5 inline size-4" />
-                Banner Promo
-            </button>
-
-            <!-- Poin 15: Tab Popup Banner dipisah dari Banner Promo -->
+            <!-- Poin 15 & Urutan Pertama: Tab Popup Banner di posisi pertama -->
             <button
                 type="button"
                 class="border-b-2 px-4 py-2 text-sm font-medium transition"
@@ -264,6 +250,20 @@ function destroyVoucher(voucher: AdminPromoVoucher): void {
             >
                 <span class="mr-1.5">⭐</span>
                 Popup Banner
+            </button>
+
+            <button
+                type="button"
+                class="border-b-2 px-4 py-2 text-sm font-medium transition"
+                :class="
+                    activeTab === 'banners'
+                        ? 'border-primary text-foreground'
+                        : 'border-transparent text-muted-foreground hover:text-foreground'
+                "
+                @click="activeTab = 'banners'"
+            >
+                <ImageIcon class="mr-1.5 inline size-4" />
+                Banner Promo
             </button>
 
             <!-- Poin 13: Tab Voucher Promo dihide (dikomentari, jangan dihapus)

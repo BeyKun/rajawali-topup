@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\VoucherStatus;
+use App\Events\CatalogUpdated;
 use Database\Factories\ProductFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -40,6 +41,13 @@ class Product extends Model
 {
     /** @use HasFactory<ProductFactory> */
     use HasFactory, SoftDeletes;
+
+    protected static function booted(): void
+    {
+        static::saved(fn () => CatalogUpdated::dispatchSafely('product_saved'));
+        static::deleted(fn () => CatalogUpdated::dispatchSafely('product_deleted'));
+        static::forceDeleted(fn () => CatalogUpdated::dispatchSafely('product_force_deleted'));
+    }
 
     /**
      * Get the attributes that should be cast.

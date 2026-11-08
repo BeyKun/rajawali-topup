@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\VoucherStatus;
+use App\Events\CatalogUpdated;
 use Database\Factories\VoucherFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -38,6 +39,12 @@ class Voucher extends Model
 {
     /** @use HasFactory<VoucherFactory> */
     use HasFactory;
+
+    protected static function booted(): void
+    {
+        static::saved(fn () => CatalogUpdated::dispatchSafely('voucher_saved'));
+        static::deleted(fn () => CatalogUpdated::dispatchSafely('voucher_deleted'));
+    }
 
     /**
      * Get the attributes that should be cast.

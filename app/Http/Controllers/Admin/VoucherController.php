@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Enums\VoucherStatus;
+use App\Events\CatalogUpdated;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\VoucherCheckRequest;
 use App\Http\Requests\Admin\VoucherRequest;
@@ -302,6 +303,7 @@ class VoucherController extends Controller
         }
 
         $voucher->save();
+        CatalogUpdated::dispatchSafely('voucher_updated');
 
         Inertia::flash('toast', [
             'type' => 'success',
