@@ -107,3 +107,75 @@ test('kabupaten admin cannot delete product outside their managed city', functio
     $response->assertForbidden();
     expect(Product::find($productInCity2->id))->not->toBeNull();
 });
+
+test('editing a voucher to a new catalog and then back to the original catalog leaves the new catalog intact with 0 vouchers', function () {
+    $catalogA = Product::factory()->create([
+        'name' => 'Paket Awal 10GB',
+        'quota_description' => 'Kuota Utama 10GB',
+        'hpp_price' => 20000,
+        'sell_price' => 20400,
+        'city_id' => null,
+    ]);
+
+    $voucher1 = Voucher::factory()->create([
+        'product_id' => $catalogA->id,
+        'serial_number' => '123456789012',
+        'status' => VoucherStatus::Available,
+        'city_id' => null,
+    ]);
+
+    $voucher2 = Voucher::factory()->create([
+        'product_id' => $catalogA->id,
+        'serial_number' => '123456789013',
+        'status' => VoucherStatus::Available,
+        'city_id' => null,
+    ]);
+
+    // Step 1: Edit voucher1 manually to a new title & description -> creates Catalog B
+    $this->actingAs($this->admin)
+        ->put("/admin/vouchers/{$voucher1->serial_number}", [
+            'product_id' => null,
+            'title' => 'Paket Spesial Baru',
+            'description' => 'Deskripsi Baru 15GB',
+            'serial_number' => $voucher1->serial_number,
+            'status' => VoucherStatus::Available->value,
+            'sell_price' => 20000,
+            'margin_percentage' => 2,
+            'city_ids' => [],
+        ])
+        ->assertRedirect();
+
+    $voucher1->refresh();
+    $catalogB = Product::find($voucher1->product_id);
+
+    expect($catalogB)->not->toBeNull()
+        ->and($catalogB->id)->not->toBe($catalogA->id)
+        ->and($catalogB->name)->toBe('Paket Spesial Baru')
+        ->and($catalogB->quota_description)->toBe('Deskripsi Baru 15GB')
+        ->and($catalogB->vouchers()->count())->toBe(1);
+
+    // Step 2: Edit voucher1 back to Catalog A from the dropdown
+    $this->actingAs($this->admin)
+        ->put("/admin/vouchers/{$voucher1->serial_number}", [
+            'product_id' => $catalogA->id,
+            'title' => $catalogA->name,
+            'description' => $catalogA->quota_description,
+            'serial_number' => $voucher1->serial_number,
+            'status' => VoucherStatus::Available->value,
+            'sell_price' => 20000,
+            'margin_percentage' => 2,
+            'city_ids' => [],
+        ])
+        ->assertRedirect();
+
+    $voucher1->refresh();
+    $catalogB->refresh();
+
+    // Voucher 1 returned to Catalog A
+    expect($voucher1->product_id)->toBe($catalogA->id)
+        ->and($catalogA->vouchers()->count())->toBe(2)
+        // Catalog B is NOT overwritten into a duplicate of Catalog A, and its total vouchers is 0
+        ->and($catalogB->name)->toBe('Paket Spesial Baru')
+        ->and($catalogB->quota_description)->toBe('Deskripsi Baru 15GB')
+        ->and($catalogB->vouchers()->count())->toBe(0);
+});

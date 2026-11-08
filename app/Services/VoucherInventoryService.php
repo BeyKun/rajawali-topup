@@ -194,6 +194,19 @@ class VoucherInventoryService
 
         $product = Product::query()->firstOrNew(['slug' => $slug]);
 
+        if (! $product->exists) {
+            $existingByName = Product::query()
+                ->where('name', $name)
+                ->where('quota_description', $description)
+                ->where('city_id', $cityId)
+                ->when($sellPrice !== null, fn ($q) => $q->where('sell_price', $sellPrice))
+                ->first();
+
+            if ($existingByName !== null) {
+                $product = $existingByName;
+            }
+        }
+
         $product->name = $name;
         $product->quota_description = $description;
         $product->validity_days = $this->parseValidityDays($check['validity']);

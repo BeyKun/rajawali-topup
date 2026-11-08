@@ -140,9 +140,12 @@ function onProductOptionChange(val: string): void {
     if (val !== 'manual') {
         const product = props.products?.find((p) => String(p.id) === val);
         if (product) {
+            editForm.product_id = product.id;
             editForm.title = product.name;
             editForm.description = product.quota_description;
         }
+    } else {
+        editForm.product_id = null;
     }
 }
 
@@ -182,6 +185,7 @@ const selectedProductDisplayLabel = computed(() => {
 });
 
 const editForm = useForm({
+    product_id: null as number | null,
     title: '',
     description: '',
     serial_number: '',
@@ -205,13 +209,19 @@ function openEdit(voucher: AdminVoucher): void {
     editForm.title = currentTitle;
     editForm.description = currentDesc;
 
-    const matchedProduct = props.products?.find(
-        (p) => p.name === currentTitle && p.quota_description === currentDesc,
-    );
+    const matchedProduct =
+        (voucher.product_id != null
+            ? props.products?.find((p) => p.id === voucher.product_id)
+            : undefined) ??
+        props.products?.find(
+            (p) => p.name === currentTitle && p.quota_description === currentDesc,
+        );
     if (matchedProduct) {
         selectedProductOption.value = String(matchedProduct.id);
+        editForm.product_id = matchedProduct.id;
     } else {
         selectedProductOption.value = 'manual';
+        editForm.product_id = null;
     }
 
     editForm.serial_number = formatSerialNumber(voucher.serial_number);
@@ -311,6 +321,7 @@ function submitEdit(): void {
 
     editForm.transform((data) => ({
         ...data,
+        product_id: selectedProductOption.value !== 'manual' ? data.product_id : null,
         title: data.title ? data.title.trim() : '',
         description: data.description ? data.description.trim() : '',
         serial_number: cleanDigits(data.serial_number),

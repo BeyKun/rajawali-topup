@@ -24,6 +24,7 @@ export type VoucherStatus =
 
 export type AdminVoucher = {
     id: number;
+    product_id?: number | null;
     serial_number: string;
     product_name: string | null;
     title?: string | null;

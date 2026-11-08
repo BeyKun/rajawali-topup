@@ -76,6 +76,7 @@ class VoucherController extends Controller
             ->withQueryString()
             ->through(fn (Voucher $voucher): array => [
                 'id' => $voucher->id,
+                'product_id' => $voucher->product_id,
                 'serial_number' => $voucher->serial_number,
                 'product_name' => $voucher->product?->name,
                 'title' => $voucher->product?->name,
@@ -274,29 +275,84 @@ class VoucherController extends Controller
             ->where('id', '!=', $voucher->id)
             ->exists();
 
-        if ($isSharedProduct) {
-            $checkData = [
-                'name' => $title,
-                'description' => $description,
-                'validity' => (string) ($voucher->validity ?: ($voucher->product?->validity_days ?: '1')),
-                'region' => (string) ($voucher->region ?: ($voucher->product?->region ?: '')),
-                'serial_number' => $voucher->serial_number,
-            ];
+        $currentProduct = $voucher->product;
+        $requestedProductId = $request->filled('product_id') ? (int) $request->input('product_id') : null;
+        $selectedCatalog = $requestedProductId !== null
+            ? Product::query()
+                ->whereKey($requestedProductId)
+                ->where('name', $title)
+                ->where('quota_description', $description)
+                ->first()
+            : null;
 
-            $newProduct = $this->inventory->resolveProduct(
-                $checkData,
-                $finalSellPrice,
-                $voucher->city_id,
-                $basePrice,
-                $title,
-                $description
-            );
+        $isCatalogTextChanged = $currentProduct === null
+            || $currentProduct->name !== $title
+            || $currentProduct->quota_description !== $description;
 
-            $voucher->product_id = $newProduct->id;
-        } elseif ($voucher->product !== null) {
-            $voucher->product->update([
-                'name' => $title,
-                'quota_description' => $description,
+        if ($selectedCatalog !== null && $selectedCatalog->id !== $voucher->product_id) {
+            $voucher->product_id = $selectedCatalog->id;
+        } elseif ($isCatalogTextChanged) {
+            $existingTarget = $selectedCatalog ?? Product::query()
+                ->where('name', $title)
+                ->where('quota_description', $description)
+                ->when(
+                    $voucher->city_id !== null,
+                    fn (Builder $q) => $q->where(fn (Builder $inner) => $inner
+                        ->where('city_id', $voucher->city_id)
+                        ->orWhereNull('city_id')),
+                    fn (Builder $q) => $q->whereNull('city_id')
+                )
+                ->orderByRaw('CASE WHEN sell_price = ? THEN 0 ELSE 1 END', [$finalSellPrice])
+                ->first();
+
+            if ($existingTarget !== null) {
+                $voucher->product_id = $existingTarget->id;
+            } else {
+                $checkData = [
+                    'name' => $title,
+                    'description' => $description,
+                    'validity' => (string) ($voucher->validity ?? ''),
+                    'region' => (string) ($voucher->region ?: ($currentProduct?->region ?: '')),
+                    'serial_number' => $voucher->serial_number,
+                ];
+
+                $newProduct = $this->inventory->resolveProduct(
+                    $checkData,
+                    $finalSellPrice,
+                    $voucher->city_id,
+                    $basePrice,
+                    $title,
+                    $description
+                );
+
+                $voucher->product_id = $newProduct->id;
+            }
+        } elseif ($isSharedProduct) {
+            $isPriceChanged = (float) $currentProduct->sell_price !== $finalSellPrice
+                || (float) $currentProduct->hpp_price !== $basePrice;
+
+            if ($isPriceChanged) {
+                $checkData = [
+                    'name' => $title,
+                    'description' => $description,
+                    'validity' => (string) ($voucher->validity ?? ''),
+                    'region' => (string) ($voucher->region ?: ($currentProduct->region ?: '')),
+                    'serial_number' => $voucher->serial_number,
+                ];
+
+                $newProduct = $this->inventory->resolveProduct(
+                    $checkData,
+                    $finalSellPrice,
+                    $voucher->city_id,
+                    $basePrice,
+                    $title,
+                    $description
+                );
+
+                $voucher->product_id = $newProduct->id;
+            }
+        } elseif ($currentProduct !== null) {
+            $currentProduct->update([
                 'sell_price' => $finalSellPrice,
                 'hpp_price' => $basePrice,
             ]);
