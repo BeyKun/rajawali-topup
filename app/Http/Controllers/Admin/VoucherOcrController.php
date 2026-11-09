@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\VoucherOcrLog;
 use App\Services\VoucherOcrService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -31,12 +32,39 @@ class VoucherOcrController extends Controller
 
         /** @var UploadedFile $file */
         $file = $request->file('image');
+        $storedPath = $file->store('voucher-ocr-logs', 'public');
+        $user = $request->user();
+        $cityId = $user?->effectiveCityId() ?? ($user?->managedCityIds()[0] ?? null);
 
         try {
             $result = $this->ocrService->scanPhoto($file);
 
+            VoucherOcrLog::query()->create([
+                'user_id' => $user?->id,
+                'city_id' => $cityId,
+                'image_path' => $storedPath,
+                'original_filename' => $file->getClientOriginalName(),
+                'is_success' => true,
+                'vouchers_count' => count($result['vouchers'] ?? []),
+                'extracted_vouchers' => $result['vouchers'] ?? [],
+                'raw_texts' => $result['raw_texts'] ?? [],
+                'error_message' => null,
+            ]);
+
             return response()->json($result);
         } catch (Throwable $e) {
+            VoucherOcrLog::query()->create([
+                'user_id' => $user?->id,
+                'city_id' => $cityId,
+                'image_path' => $storedPath,
+                'original_filename' => $file->getClientOriginalName(),
+                'is_success' => false,
+                'vouchers_count' => 0,
+                'extracted_vouchers' => [],
+                'raw_texts' => [],
+                'error_message' => $e->getMessage(),
+            ]);
+
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage() ?: 'Terjadi kesalahan saat memproses OCR pada foto voucher.',

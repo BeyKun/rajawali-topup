@@ -4,16 +4,20 @@ namespace App\Http\Controllers\Admin;
 
 use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
+use App\Mail\KabupatenAdminCredentialsMail;
 use App\Models\City;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Throwable;
 
 /**
  * Super-admin management of kabupaten admin accounts.
@@ -87,7 +91,6 @@ class KabupatenAdminController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')],
-            'password' => ['required', 'string', Password::defaults()],
             'province_id' => ['nullable', 'integer', Rule::exists('provinces', 'id')],
             'city_id' => ['nullable', 'integer', Rule::exists('cities', 'id')],
             'city_ids' => ['nullable', 'array', 'max:1'],
@@ -108,20 +111,47 @@ class KabupatenAdminController extends Controller
 
         $primaryCity = City::query()->find($cityId);
         $provinceId = $validated['province_id'] ?? $primaryCity?->province_id;
+        $defaultPassword = 'Rajawali'.now()->timestamp;
 
-        $admin = User::query()->create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'password' => Hash::make($validated['password']),
-            'role' => UserRole::KabupatenAdmin,
-            'province_id' => $provinceId,
-            'city_id' => $cityId,
-            'email_verified_at' => now(),
-        ]);
+        DB::beginTransaction();
 
-        $admin->cities()->sync([$cityId]);
+        try {
+            $admin = User::query()->create([
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'password' => Hash::make($defaultPassword),
+                'role' => UserRole::KabupatenAdmin,
+                'province_id' => $provinceId,
+                'city_id' => $cityId,
+                'email_verified_at' => now(),
+            ]);
 
-        Inertia::flash('toast', ['type' => 'success', 'message' => 'Admin wilayah berhasil dibuat.']);
+            $admin->cities()->sync([$cityId]);
+
+            $cityName = $primaryCity?->name ?? 'Wilayah';
+            $sent = Mail::to($admin->email)->send(
+                new KabupatenAdminCredentialsMail($admin, $defaultPassword, $cityName)
+            );
+
+            if ($sent === null && ! app()->environment('testing')) {
+                throw new \RuntimeException('Gagal mengirim email kredensial.');
+            }
+
+            DB::commit();
+        } catch (Throwable $e) {
+            DB::rollBack();
+
+            Log::error('Gagal membuat admin wilayah atau mengirim email kredensial: '.$e->getMessage(), [
+                'email' => $validated['email'],
+                'exception' => $e,
+            ]);
+
+            throw ValidationException::withMessages([
+                'email' => 'Gagal mengirim email kredensial ke alamat tersebut. Pastikan alamat email benar dan aktif.',
+            ]);
+        }
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => "Admin wilayah {$admin->name} berhasil dibuat dan password telah dikirim ke email."]);
 
         return back();
     }
@@ -136,7 +166,6 @@ class KabupatenAdminController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($admin->id)],
-            'password' => ['nullable', 'string', Password::defaults()],
             'province_id' => ['nullable', 'integer', Rule::exists('provinces', 'id')],
             'city_id' => ['nullable', 'integer', Rule::exists('cities', 'id')],
             'city_ids' => ['nullable', 'array', 'max:1'],
@@ -164,10 +193,6 @@ class KabupatenAdminController extends Controller
             'province_id' => $provinceId,
             'city_id' => $cityId,
         ]);
-
-        if (! empty($validated['password'])) {
-            $admin->password = Hash::make($validated['password']);
-        }
 
         $admin->save();
         $admin->cities()->sync([$cityId]);

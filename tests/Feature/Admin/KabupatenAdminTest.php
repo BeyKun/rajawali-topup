@@ -2,11 +2,14 @@
 
 use App\Enums\UserRole;
 use App\Enums\VoucherStatus;
+use App\Mail\KabupatenAdminCredentialsMail;
 use App\Models\City;
 use App\Models\Product;
 use App\Models\Province;
 use App\Models\User;
 use App\Models\Voucher;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 
 beforeEach(function () {
     $this->withoutVite();
@@ -28,24 +31,49 @@ test('only super admins can manage kabupaten admins', function () {
     $this->actingAs($super)->get('/admin/admins')->assertOk();
 });
 
-test('a super admin can create a kabupaten admin scoped to a city', function () {
+test('a super admin can create a kabupaten admin scoped to a city and an email with credentials is sent', function () {
+    Mail::fake();
     $super = User::factory()->admin()->create();
 
     $this->actingAs($super)
         ->post('/admin/admins', [
             'name' => 'Admin Sikka',
             'email' => 'sikka@example.com',
-            'password' => 'password123',
             'province_id' => $this->province->id,
             'city_id' => $this->cityA->id,
         ])
         ->assertRedirect();
 
-    $this->assertDatabaseHas('users', [
-        'email' => 'sikka@example.com',
-        'role' => UserRole::KabupatenAdmin->value,
-        'province_id' => $this->province->id,
-        'city_id' => $this->cityA->id,
+    $user = User::query()->where('email', 'sikka@example.com')->first();
+    expect($user)->not->toBeNull()
+        ->and($user->role)->toBe(UserRole::KabupatenAdmin)
+        ->and($user->province_id)->toBe($this->province->id)
+        ->and($user->city_id)->toBe($this->cityA->id);
+
+    Mail::assertSent(KabupatenAdminCredentialsMail::class, function ($mail) use ($user) {
+        return $mail->hasTo('sikka@example.com')
+            && str_starts_with($mail->plainPassword, 'Rajawali')
+            && Hash::check($mail->plainPassword, $user->password);
+    });
+});
+
+test('creating a kabupaten admin fails and rolls back when email delivery fails', function () {
+    Mail::shouldReceive('to->send')->andThrow(new \Exception('SMTP timeout or invalid email'));
+
+    $super = User::factory()->admin()->create();
+
+    $response = $this->actingAs($super)
+        ->from('/admin/admins')
+        ->post('/admin/admins', [
+            'name' => 'Admin Failed',
+            'email' => 'bad-email@example.com',
+            'province_id' => $this->province->id,
+            'city_id' => $this->cityA->id,
+        ]);
+
+    $response->assertSessionHasErrors('email');
+    $this->assertDatabaseMissing('users', [
+        'email' => 'bad-email@example.com',
     ]);
 });
 

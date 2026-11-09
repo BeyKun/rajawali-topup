@@ -55,7 +55,6 @@ onClickOutside(citySelectRef, () => {
 const form = useForm({
     name: '',
     email: '',
-    password: '',
     city_id: null as number | null,
 });
 
@@ -114,7 +113,6 @@ function openEdit(admin: AdminKabupatenAdminRow): void {
     form.clearErrors();
     form.name = admin.name;
     form.email = admin.email;
-    form.password = '';
     form.city_id = admin.city_id ?? (admin.city_ids && admin.city_ids.length > 0 ? admin.city_ids[0] : null);
     isCitySelectOpen.value = false;
     citySearchQuery.value = '';
@@ -290,22 +288,11 @@ function destroy(admin: AdminKabupatenAdminRow): void {
                     <InputError :message="form.errors.email" />
                 </div>
 
-                <div class="grid gap-2">
-                    <Label for="password">
-                        Password
-                        <span
-                            v-if="editing"
-                            class="text-xs font-normal text-muted-foreground"
-                        >
-                            (kosongkan bila tidak diubah)
-                        </span>
-                    </Label>
-                    <Input
-                        id="password"
-                        v-model="form.password"
-                        type="password"
-                    />
-                    <InputError :message="form.errors.password" />
+                <div v-if="!editing" class="rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs">
+                    <p class="font-semibold text-foreground">Password Dibuat Otomatis</p>
+                    <p class="mt-0.5 text-muted-foreground">
+                        Password default berformat <code class="rounded bg-muted px-1 py-0.5 font-mono text-primary font-semibold">Rajawali{timestamp}</code> akan dibuat otomatis dan langsung dikirimkan ke email admin di atas.
+                    </p>
                 </div>
 
                 <div class="grid gap-2">

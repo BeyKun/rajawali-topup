@@ -2,6 +2,7 @@
 import { Link, usePage } from '@inertiajs/vue3';
 import {
     BadgePercent,
+    KeyRound,
     LayoutGrid,
     Package,
     Receipt,
@@ -133,6 +134,11 @@ const mainNavItems = computed<NavItem[]>(() => {
                 title: 'Admin Wilayah',
                 href: '/admin/admins',
                 icon: ShieldCheck,
+            },
+            {
+                title: 'Reset Password',
+                href: '/settings/security',
+                icon: KeyRound,
             },
         ];
     }

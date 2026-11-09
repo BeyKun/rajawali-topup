@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\ProductRequest;
 use App\Models\Product;
 use App\Models\Voucher;
+use App\Models\VoucherOcrLog;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -86,6 +87,30 @@ class ProductController extends Controller
 
         $summaryQuery = Product::query()->forCity($cityIds);
 
+        $isSuperAdmin = (bool) $request->user()?->isSuperAdmin();
+        $ocrLogs = $isSuperAdmin
+            ? VoucherOcrLog::query()
+                ->with(['user:id,name,email,role', 'city.province:id,name'])
+                ->latest('created_at')
+                ->paginate(15, ['*'], 'ocr_page')
+                ->withQueryString()
+                ->through(fn (VoucherOcrLog $log): array => [
+                    'id' => $log->id,
+                    'user_name' => $log->user?->name ?? 'Anonim',
+                    'user_email' => $log->user?->email,
+                    'user_role' => $log->user?->role?->value,
+                    'city_name' => $log->city?->name ?? '-',
+                    'image_url' => route('admin.ocr-logs.image', $log->id),
+                    'original_filename' => $log->original_filename,
+                    'is_success' => $log->is_success,
+                    'vouchers_count' => $log->vouchers_count,
+                    'extracted_vouchers' => $log->extracted_vouchers ?? [],
+                    'raw_texts' => $log->raw_texts ?? [],
+                    'error_message' => $log->error_message,
+                    'created_at' => $log->created_at?->toIso8601String(),
+                ])
+            : null;
+
         return Inertia::render('admin/products/Index', [
             'products' => $products,
             'filters' => [
@@ -100,6 +125,8 @@ class ProductController extends Controller
                     ->where('status', VoucherStatus::Available)
                     ->count(),
             ],
+            'is_super_admin' => $isSuperAdmin,
+            'ocr_logs' => $ocrLogs,
         ]);
     }
 

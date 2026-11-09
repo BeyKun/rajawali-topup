@@ -12,8 +12,10 @@ use App\Http\Controllers\Admin\RegionController;
 use App\Http\Controllers\Admin\TelkomselAreaController;
 use App\Http\Controllers\Admin\VoucherController;
 use App\Http\Controllers\Admin\VoucherOcrController;
+use App\Models\VoucherOcrLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 Route::get('/', function () {
@@ -53,6 +55,13 @@ Route::middleware(['auth', 'verified', 'admin'])
         Route::get('vouchers/batch/{batchId}', [VoucherController::class, 'batchStatus'])->name('vouchers.batch-status');
         Route::get('vouchers/latest-batch', [VoucherController::class, 'latestBatchStatus'])->name('vouchers.latest-batch');
         Route::post('vouchers/scan-photo', [VoucherOcrController::class, 'scanPhoto'])->name('vouchers.scan-photo');
+        Route::get('ocr-logs/{voucherOcrLog}/image', function (VoucherOcrLog $voucherOcrLog) {
+            if (! Storage::disk('public')->exists($voucherOcrLog->image_path)) {
+                abort(404);
+            }
+
+            return Storage::disk('public')->response($voucherOcrLog->image_path);
+        })->name('ocr-logs.image');
 
         Route::get('outlets', [OutletUserController::class, 'index'])->name('outlets.index');
         Route::post('outlets', [OutletUserController::class, 'store'])->name('outlets.store');

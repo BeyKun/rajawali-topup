@@ -699,7 +699,7 @@ latestBatch.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
     latestBatch.form = latestBatchForm
 /**
 * @see \App\Http\Controllers\Admin\VoucherOcrController::scanPhoto
- * @see app/Http/Controllers/Admin/VoucherOcrController.php:21
+ * @see app/Http/Controllers/Admin/VoucherOcrController.php:22
  * @route '/admin/vouchers/scan-photo'
  */
 export const scanPhoto = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -714,7 +714,7 @@ scanPhoto.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\VoucherOcrController::scanPhoto
- * @see app/Http/Controllers/Admin/VoucherOcrController.php:21
+ * @see app/Http/Controllers/Admin/VoucherOcrController.php:22
  * @route '/admin/vouchers/scan-photo'
  */
 scanPhoto.url = (options?: RouteQueryOptions) => {
@@ -723,7 +723,7 @@ scanPhoto.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\Admin\VoucherOcrController::scanPhoto
- * @see app/Http/Controllers/Admin/VoucherOcrController.php:21
+ * @see app/Http/Controllers/Admin/VoucherOcrController.php:22
  * @route '/admin/vouchers/scan-photo'
  */
 scanPhoto.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -733,7 +733,7 @@ scanPhoto.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
 
     /**
 * @see \App\Http\Controllers\Admin\VoucherOcrController::scanPhoto
- * @see app/Http/Controllers/Admin/VoucherOcrController.php:21
+ * @see app/Http/Controllers/Admin/VoucherOcrController.php:22
  * @route '/admin/vouchers/scan-photo'
  */
     const scanPhotoForm = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -743,7 +743,7 @@ scanPhoto.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
 
             /**
 * @see \App\Http\Controllers\Admin\VoucherOcrController::scanPhoto
- * @see app/Http/Controllers/Admin/VoucherOcrController.php:21
+ * @see app/Http/Controllers/Admin/VoucherOcrController.php:22
  * @route '/admin/vouchers/scan-photo'
  */
         scanPhotoForm.post = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({

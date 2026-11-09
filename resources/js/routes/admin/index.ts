@@ -1,6 +1,7 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition, type RouteFormDefinition } from './../../wayfinder'
 import products from './products'
 import vouchers from './vouchers'
+import ocrLogs from './ocr-logs'
 import outlets from './outlets'
 import orders from './orders'
 import regions from './regions'
@@ -89,6 +90,7 @@ const admin = {
     dashboard: Object.assign(dashboard, dashboard),
 products: Object.assign(products, products),
 vouchers: Object.assign(vouchers, vouchers),
+ocrLogs: Object.assign(ocrLogs, ocrLogs),
 outlets: Object.assign(outlets, outlets),
 orders: Object.assign(orders, orders),
 regions: Object.assign(regions, regions),
