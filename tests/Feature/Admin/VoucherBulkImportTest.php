@@ -12,6 +12,8 @@ beforeEach(function () {
     $this->withoutVite();
     config(['telkomsel.mock' => true]);
     $this->admin = User::factory()->admin()->create();
+    $this->province = Province::create(['code' => '99', 'name' => 'Provinsi Default']);
+    $this->city = City::create(['province_id' => $this->province->id, 'province_code' => '99', 'code' => '99.01', 'name' => 'Kota Default']);
 });
 
 test('bulk import stores only the valid rows', function () {
@@ -24,7 +26,7 @@ test('bulk import stores only the valid rows', function () {
     $file = UploadedFile::fake()->createWithContent('vouchers.csv', $content);
 
     $this->actingAs($this->admin)
-        ->post('/admin/vouchers/bulk', ['file' => $file])
+        ->post('/admin/vouchers/bulk', ['file' => $file, 'city_ids' => [$this->city->id]])
         ->assertRedirect('/admin/vouchers/bulk');
 
     expect(Voucher::query()->count())->toBe(2);
@@ -51,7 +53,7 @@ test('bulk import rejects batch if serials already exist in inventory', function
     $file = UploadedFile::fake()->createWithContent('vouchers.csv', $content);
 
     $this->actingAs($this->admin)
-        ->post('/admin/vouchers/bulk', ['file' => $file])
+        ->post('/admin/vouchers/bulk', ['file' => $file, 'city_ids' => [$this->city->id]])
         ->assertSessionHasErrors(['file' => 'Voucher dengan nomor seri berikut sudah pernah ada di inventori: 300338120354.']);
 
     expect(Voucher::query()->count())->toBe(1);
@@ -67,7 +69,7 @@ test('bulk import rejects batch if file contains duplicate serial numbers', func
     $file = UploadedFile::fake()->createWithContent('vouchers.csv', $content);
 
     $this->actingAs($this->admin)
-        ->post('/admin/vouchers/bulk', ['file' => $file])
+        ->post('/admin/vouchers/bulk', ['file' => $file, 'city_ids' => [$this->city->id]])
         ->assertSessionHasErrors(['file' => 'Terdapat nomor seri yang terduplikasi di dalam data import: 300338120356.']);
 
     expect(Voucher::query()->count())->toBe(0);
@@ -77,14 +79,27 @@ test('bulk import rejects a file without valid rows', function () {
     $file = UploadedFile::fake()->createWithContent('vouchers.csv', "header\nfoo");
 
     $this->actingAs($this->admin)
-        ->post('/admin/vouchers/bulk', ['file' => $file])
+        ->post('/admin/vouchers/bulk', ['file' => $file, 'city_ids' => [$this->city->id]])
         ->assertSessionHasErrors('file');
 });
 
 test('bulk import requires a file', function () {
     $this->actingAs($this->admin)
-        ->post('/admin/vouchers/bulk', [])
+        ->post('/admin/vouchers/bulk', ['city_ids' => [$this->city->id]])
         ->assertSessionHasErrors('file');
+});
+
+test('super admin bulk import requires city_ids', function () {
+    $content = implode("\n", [
+        'serial_number,hrn,sell_price',
+        '300338120354,71125613431848001,25000',
+    ]);
+
+    $file = UploadedFile::fake()->createWithContent('vouchers.csv', $content);
+
+    $this->actingAs($this->admin)
+        ->post('/admin/vouchers/bulk', ['file' => $file])
+        ->assertSessionHasErrors('city_ids');
 });
 
 test('super admin sees is_super_admin and cities props on bulk page', function () {
@@ -97,7 +112,7 @@ test('super admin sees is_super_admin and cities props on bulk page', function (
         ->assertInertia(fn (AssertableInertia $page) => $page
             ->component('admin/vouchers/Bulk')
             ->where('is_super_admin', true)
-            ->has('cities', 1)
+            ->has('cities', 2)
         );
 });
 
@@ -154,7 +169,7 @@ test('bulk import csv rejects file with zero sell price', function () {
     $file = UploadedFile::fake()->createWithContent('vouchers_zero.csv', $content);
 
     $this->actingAs($this->admin)
-        ->post('/admin/vouchers/bulk', ['file' => $file])
+        ->post('/admin/vouchers/bulk', ['file' => $file, 'city_ids' => [$this->city->id]])
         ->assertSessionHasErrors('file');
 
     expect(Voucher::query()->count())->toBe(0);
@@ -185,6 +200,7 @@ test('bulk import groups vouchers by title description and price into products',
             'description' => '10 GB Kuota Utama 30 Hari',
             'rows' => $rows,
             'margin_percentage' => 0,
+            'city_ids' => [$this->city->id],
         ])
         ->assertRedirect('/admin/vouchers/bulk');
 
@@ -229,6 +245,7 @@ test('bulk import respects per-row title and description from scanned rows', fun
         ->post('/admin/vouchers/bulk', [
             'rows' => $rows,
             'margin_percentage' => 0,
+            'city_ids' => [$this->city->id],
         ])
         ->assertRedirect('/admin/vouchers/bulk');
 

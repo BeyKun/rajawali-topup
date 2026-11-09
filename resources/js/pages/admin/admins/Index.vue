@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import { router, useForm } from '@inertiajs/vue3';
-import { Pencil, Plus, Search, ShieldCheck, Trash2, X } from '@lucide/vue';
-import { reactive, ref } from 'vue';
+import { Check, ChevronDown, Pencil, Plus, Search, ShieldCheck, Trash2, X } from '@lucide/vue';
+import { onClickOutside } from '@vueuse/core';
+import { computed, nextTick, reactive, ref } from 'vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import Pagination from '@/components/admin/Pagination.vue';
-import SearchableCityMultiSelect, {
-    type CityOption,
-} from '@/components/SearchableCityMultiSelect.vue';
+import { type CityOption } from '@/components/SearchableCityMultiSelect.vue';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -44,12 +43,53 @@ const filterState = reactive({
 const editing = ref<AdminKabupatenAdminRow | null>(null);
 const showDialog = ref(false);
 
+const isCitySelectOpen = ref(false);
+const citySelectRef = ref<HTMLElement | null>(null);
+const citySearchInputRef = ref<HTMLInputElement | null>(null);
+const citySearchQuery = ref('');
+
+onClickOutside(citySelectRef, () => {
+    isCitySelectOpen.value = false;
+});
+
 const form = useForm({
     name: '',
     email: '',
     password: '',
-    city_ids: [] as number[],
+    city_id: null as number | null,
 });
+
+const filteredCities = computed(() => {
+    const list = props.cities ?? [];
+    const q = citySearchQuery.value.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter((c) => {
+        const cityName = c.name.toLowerCase();
+        const provName = (c.province_name || '').toLowerCase();
+        return cityName.includes(q) || provName.includes(q);
+    });
+});
+
+const selectedCity = computed(() => {
+    if (form.city_id === null) return null;
+    return (props.cities ?? []).find((c) => c.id === form.city_id) ?? null;
+});
+
+function toggleCitySelect(): void {
+    isCitySelectOpen.value = !isCitySelectOpen.value;
+    if (isCitySelectOpen.value) {
+        citySearchQuery.value = '';
+        nextTick(() => {
+            citySearchInputRef.value?.focus();
+        });
+    }
+}
+
+function selectCity(cityId: number): void {
+    form.city_id = cityId;
+    form.clearErrors('city_id');
+    isCitySelectOpen.value = false;
+}
 
 function applyFilters(): void {
     router.get(
@@ -62,8 +102,10 @@ function applyFilters(): void {
 function openCreate(): void {
     editing.value = null;
     form.reset();
-    form.city_ids = [];
+    form.city_id = null;
     form.clearErrors();
+    isCitySelectOpen.value = false;
+    citySearchQuery.value = '';
     showDialog.value = true;
 }
 
@@ -73,9 +115,9 @@ function openEdit(admin: AdminKabupatenAdminRow): void {
     form.name = admin.name;
     form.email = admin.email;
     form.password = '';
-    form.city_ids = admin.city_ids && admin.city_ids.length > 0
-        ? [...admin.city_ids]
-        : (admin.city_id ? [admin.city_id] : []);
+    form.city_id = admin.city_id ?? (admin.city_ids && admin.city_ids.length > 0 ? admin.city_ids[0] : null);
+    isCitySelectOpen.value = false;
+    citySearchQuery.value = '';
     showDialog.value = true;
 }
 
@@ -267,13 +309,70 @@ function destroy(admin: AdminKabupatenAdminRow): void {
                 </div>
 
                 <div class="grid gap-2">
-                    <Label>Wilayah Kabupaten/Kota yang Dikelola</Label>
-                    <SearchableCityMultiSelect
-                        v-model="form.city_ids"
-                        :cities="props.cities ?? []"
-                        placeholder="Pilih satu atau lebih kabupaten/kota..."
-                    />
-                    <InputError :message="form.errors.city_ids" />
+                    <Label>Wilayah Kabupaten/Kota yang Dikelola <span class="text-destructive">*</span></Label>
+                    <div ref="citySelectRef" class="relative w-full">
+                        <button
+                            type="button"
+                            class="flex min-h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                            @click="toggleCitySelect"
+                        >
+                            <span v-if="!selectedCity" class="text-muted-foreground">
+                                Pilih satu kabupaten/kota...
+                            </span>
+                            <span v-else class="truncate font-medium text-foreground">
+                                {{ selectedCity.name }}
+                                <span v-if="selectedCity.province_name" class="font-normal text-muted-foreground">
+                                    ({{ selectedCity.province_name }})
+                                </span>
+                            </span>
+                            <ChevronDown class="size-4 shrink-0 opacity-50 transition-transform" :class="{ 'rotate-180': isCitySelectOpen }" />
+                        </button>
+
+                        <div
+                            v-if="isCitySelectOpen"
+                            class="absolute z-50 mt-1 max-h-72 w-full rounded-md border bg-popover text-popover-foreground shadow-md outline-none animate-in fade-in-0 zoom-in-95"
+                        >
+                            <div class="border-b p-2">
+                                <div class="relative flex items-center">
+                                    <Search class="absolute left-2.5 size-4 text-muted-foreground" />
+                                    <input
+                                        ref="citySearchInputRef"
+                                        v-model="citySearchQuery"
+                                        type="text"
+                                        placeholder="Cari nama kabupaten/kota atau provinsi..."
+                                        class="h-9 w-full rounded-md border border-input bg-background pl-8 pr-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                                    />
+                                </div>
+                            </div>
+
+                            <div class="max-h-52 overflow-y-auto p-1">
+                                <div
+                                    v-if="filteredCities.length === 0"
+                                    class="py-6 text-center text-sm text-muted-foreground"
+                                >
+                                    Tidak ada wilayah yang cocok.
+                                </div>
+                                <div
+                                    v-for="city in filteredCities"
+                                    :key="city.id"
+                                    class="flex cursor-pointer items-center justify-between rounded-sm px-2.5 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"
+                                    @click="selectCity(city.id)"
+                                >
+                                    <div class="flex flex-col">
+                                        <span class="font-medium">{{ city.name }}</span>
+                                        <span v-if="city.province_name" class="text-xs text-muted-foreground">
+                                            {{ city.province_name }}
+                                        </span>
+                                    </div>
+                                    <Check
+                                        v-if="form.city_id === city.id"
+                                        class="size-4 text-primary"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <InputError :message="form.errors.city_id || (form.errors as Record<string, string>).city_ids" />
                 </div>
             </div>
 

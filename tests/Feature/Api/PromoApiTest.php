@@ -15,8 +15,12 @@ beforeEach(function () {
     Storage::fake('public');
 
     $this->user = User::factory()->customer()->create();
-    $this->product = Product::factory()->create(['is_active' => true, 'sell_price' => 25000]);
-    completeOutletProfile($this->user);
+    $profile = completeOutletProfile($this->user);
+    $this->product = Product::factory()->create([
+        'is_active' => true,
+        'sell_price' => 25000,
+        'city_id' => $profile->city_id,
+    ]);
 });
 
 test('the banner endpoint returns only active banners in order', function () {

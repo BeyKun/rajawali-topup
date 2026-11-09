@@ -41,11 +41,17 @@ class OutletProfileController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
+        $validated = $request->validated();
 
         $profile = OutletProfile::query()->updateOrCreate(
             ['user_id' => $user->id],
-            $request->validated(),
+            $validated,
         );
+
+        $user->update([
+            'province_id' => $validated['province_id'],
+            'city_id' => $validated['city_id'],
+        ]);
 
         return response()->json([
             'success' => true,

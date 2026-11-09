@@ -39,12 +39,14 @@ class VoucherRequest extends FormRequest
      */
     public function rules(): array
     {
+        $isSuperAdmin = (bool) $this->user()?->isSuperAdmin();
+
         return [
             'serial_number' => ['required', 'string', 'digits:12', Rule::unique('vouchers', 'serial_number')],
             'hrn' => ['required', 'string', 'digits_between:14,20'],
             'sell_price' => ['required', 'numeric', 'gt:0'],
             'margin_percentage' => ['nullable', 'numeric', 'min:0'],
-            'city_ids' => ['nullable', 'array'],
+            'city_ids' => $isSuperAdmin ? ['required', 'array', 'min:1'] : ['nullable', 'array'],
             'city_ids.*' => ['integer', 'exists:cities,id'],
         ];
     }
@@ -69,6 +71,8 @@ class VoucherRequest extends FormRequest
             'sell_price.min' => 'Harga voucher tidak boleh 0 atau kurang.',
             'margin_percentage.numeric' => 'Persentase harga jual harus berupa angka.',
             'margin_percentage.min' => 'Persentase harga jual tidak boleh negatif.',
+            'city_ids.required' => 'Wilayah berlaku wajib dipilih minimal satu kabupaten/kota.',
+            'city_ids.min' => 'Wilayah berlaku wajib dipilih minimal satu kabupaten/kota.',
             'city_ids.array' => 'Format pilihan wilayah tidak valid.',
             'city_ids.*.exists' => 'Wilayah yang dipilih tidak valid.',
         ];

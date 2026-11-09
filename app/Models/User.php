@@ -88,18 +88,41 @@ class User extends Authenticatable
 
     /**
      * Get all city IDs managed by this admin user.
-     * Combines pivot table cities and fallback single city_id.
+     * Each kabupaten admin manages a single city (`city_id`), with fallback to pivot table.
      *
      * @return array<int, int>
      */
     public function managedCityIds(): array
     {
-        $ids = $this->cities()->pluck('cities.id')->map(fn ($id) => (int) $id)->all();
-        if (empty($ids) && $this->city_id !== null) {
-            $ids = [(int) $this->city_id];
+        if ($this->city_id !== null) {
+            return [(int) $this->city_id];
         }
 
-        return array_values(array_unique($ids));
+        $firstPivotCity = $this->cities()->value('cities.id');
+
+        return $firstPivotCity !== null ? [(int) $firstPivotCity] : [];
+    }
+
+    /**
+     * Resolve the effective single city ID for a mobile customer (outlet) or kabupaten admin.
+     */
+    public function effectiveCityId(): ?int
+    {
+        if ($this->isActiveCustomer()) {
+            $profileCityId = $this->relationLoaded('outletProfile')
+                ? $this->outletProfile?->city_id
+                : $this->outletProfile()->value('city_id');
+
+            if ($profileCityId !== null) {
+                return (int) $profileCityId;
+            }
+
+            return $this->city_id !== null ? (int) $this->city_id : null;
+        }
+
+        $managed = $this->managedCityIds();
+
+        return $managed[0] ?? null;
     }
 
     /**

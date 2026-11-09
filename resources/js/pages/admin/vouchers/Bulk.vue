@@ -957,6 +957,13 @@ function parseFriendlyError(errors: Record<string, any>): string {
 }
 
 async function submitPhotoRows(): Promise<void> {
+    if (props.is_super_admin && selectedCityIds.value.length === 0) {
+        showSubmitModal.value = true;
+        submitStatus.value = 'error';
+        submitErrorMessage.value = 'Wilayah berlaku wajib dipilih minimal satu kabupaten/kota sebelum memulai import.';
+        return;
+    }
+
     const missingTitleRow = scannedRows.value.findIndex((r) => !(r.title || '').trim());
     if (missingTitleRow !== -1) {
         showSubmitModal.value = true;
@@ -1154,6 +1161,11 @@ function onCsvChange(event: Event): void {
 async function submitCsv(): Promise<void> {
     if (!batchTitle.value.trim() || !batchDescription.value.trim()) {
         toast.error('Judul Voucher dan Deskripsi Voucher wajib diisi.');
+        return;
+    }
+
+    if (props.is_super_admin && selectedCityIds.value.length === 0) {
+        toast.error('Wilayah berlaku wajib dipilih minimal satu kabupaten/kota.');
         return;
     }
 
@@ -1400,14 +1412,14 @@ function resetAndUploadMore(): void {
 
                 <!-- Super Admin: Wilayah Berlaku -->
                 <div v-if="props.is_super_admin" class="rounded-xl border bg-card p-4 space-y-2">
-                    <Label class="text-xs font-medium">Wilayah Berlaku</Label>
+                    <Label class="text-xs font-medium">Wilayah Berlaku <span class="text-destructive">*</span></Label>
                     <SearchableCityMultiSelect
                         v-model="selectedCityIds"
                         :cities="props.cities || []"
                         placeholder="Pilih wilayah kabupaten/kota berlaku..."
                     />
                     <p class="text-[11px] text-muted-foreground">
-                        Wilayah yang dipilih akan diterapkan ke seluruh voucher hasil scan ini. Jika kosong, sistem otomatis mendeteksi berdasarkan zona voucher.
+                        Wajib memilih minimal satu kabupaten/kota. Wilayah yang dipilih akan diterapkan ke seluruh voucher hasil scan ini.
                     </p>
                 </div>
 
@@ -1778,7 +1790,7 @@ function resetAndUploadMore(): void {
                 </div>
 
                 <div v-if="props.is_super_admin" class="grid gap-2">
-                    <Label>Wilayah Berlaku</Label>
+                    <Label>Wilayah Berlaku <span class="text-destructive">*</span></Label>
                     <SearchableCityMultiSelect
                         v-model="selectedCityIds"
                         :cities="props.cities || []"
@@ -1786,7 +1798,7 @@ function resetAndUploadMore(): void {
                     />
                     <InputError :message="csvForm.errors.city_ids" />
                     <p class="text-xs text-muted-foreground">
-                        Wilayah yang dipilih akan diterapkan ke seluruh voucher yang diimpor dari file CSV ini.
+                        Wajib memilih minimal satu kabupaten/kota untuk seluruh voucher yang diimpor dari file CSV ini.
                     </p>
                 </div>
 

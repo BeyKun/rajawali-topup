@@ -83,6 +83,7 @@ test('an admin-provisioned outlet checks out with a promo voucher end to end', f
             'serial_number' => '300338120351',
             'hrn' => '71125613431848001',
             'sell_price' => 25000,
+            'city_ids' => [$this->city->id],
         ])
         ->assertRedirect('/admin/vouchers');
 

@@ -35,9 +35,22 @@ class OutletUserController extends Controller
             'city_id' => $request->integer('city_id') ?: null,
         ];
 
+        $cityIds = $request->user()?->isKabupatenAdmin() ? $request->user()->managedCityIds() : null;
+
         $outlets = User::query()
             ->where('role', UserRole::Customer)
             ->with(['outletProfile.city.province:id,name'])
+            ->when($cityIds !== null, function (Builder $query) use ($cityIds): void {
+                if (empty($cityIds)) {
+                    $query->whereRaw('1 = 0');
+
+                    return;
+                }
+                $query->where(function (Builder $q) use ($cityIds): void {
+                    $q->whereIn('users.city_id', $cityIds)
+                        ->orWhereHas('outletProfile', fn (Builder $profile) => $profile->whereIn('city_id', $cityIds));
+                });
+            })
             ->when($filters['search'], function (Builder $query, string $term): void {
                 $query->where(function (Builder $inner) use ($term): void {
                     $inner->where('name', 'like', "%{$term}%")
@@ -73,6 +86,8 @@ class OutletUserController extends Controller
                 'phone' => $validated['phone'],
                 'password' => Hash::make((string) config('outlet.default_password')),
                 'role' => UserRole::Customer,
+                'province_id' => $validated['province_id'],
+                'city_id' => $validated['city_id'],
                 'email_verified_at' => now(),
             ]);
 
@@ -100,6 +115,8 @@ class OutletUserController extends Controller
             $user->update([
                 'name' => $validated['name'],
                 'phone' => $validated['phone'],
+                'province_id' => $validated['province_id'],
+                'city_id' => $validated['city_id'],
             ]);
 
             $user->outletProfile()->updateOrCreate(

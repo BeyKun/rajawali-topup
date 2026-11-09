@@ -4,8 +4,10 @@ use App\Enums\PaymentStatus;
 use App\Enums\RedeemStatus;
 use App\Enums\UserRole;
 use App\Enums\VoucherStatus;
+use App\Models\City;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\Province;
 use App\Models\TelkomselApiLog;
 use App\Models\User;
 use App\Models\Voucher;
@@ -30,6 +32,8 @@ beforeEach(function () {
 test('a physical voucher flows from admin intake to telkomsel redemption end to end', function () {
     // 1. Admin inputs 5 physical vouchers via the dashboard (mock Telkomsel check).
     $admin = User::factory()->admin()->create();
+    $province = Province::create(['code' => '11', 'name' => 'Aceh']);
+    $city = City::create(['province_id' => $province->id, 'province_code' => '11', 'code' => '11.01', 'name' => 'Aceh Selatan']);
 
     /** @var list<string> $hrns */
     $hrns = [];
@@ -42,6 +46,7 @@ test('a physical voucher flows from admin intake to telkomsel redemption end to 
             'serial_number' => '30033812035'.$index,
             'hrn' => '7112561343184800'.$index,
             'sell_price' => 25000,
+            'city_ids' => [$city->id],
         ])->assertRedirect('/admin/vouchers');
     }
 
@@ -74,7 +79,7 @@ test('a physical voucher flows from admin intake to telkomsel redemption end to 
     $token = (string) $auth->json('token');
     $customerId = (int) $auth->json('user.id');
 
-    completeOutletProfile(User::query()->findOrFail($customerId));
+    completeOutletProfile(User::query()->findOrFail($customerId), $city);
 
     expect($token)->not->toBeEmpty()
         ->and((int) $customer->id)->toBe($customerId)

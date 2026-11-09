@@ -23,26 +23,51 @@ function twoCities(): array
     return compact('province', 'cityA', 'cityB');
 }
 
-test('outlets only see packages for their own city plus national packages', function () {
+test('outlets only see packages for their own city and never see packages from other cities or without city_id', function () {
     ['cityA' => $cityA, 'cityB' => $cityB] = twoCities();
 
     $outlet = User::factory()->customer()->create(['city_id' => $cityA->id]);
 
     $local = Product::factory()->create(['is_active' => true, 'city_id' => $cityA->id, 'sort_order' => 1]);
     $other = Product::factory()->create(['is_active' => true, 'city_id' => $cityB->id, 'sort_order' => 2]);
-    $national = Product::factory()->create(['is_active' => true, 'city_id' => null, 'sort_order' => 3]);
+    $unscoped = Product::factory()->create(['is_active' => true, 'city_id' => null, 'sort_order' => 3]);
 
-    foreach ([$local, $other, $national] as $product) {
-        Voucher::factory()->create(['product_id' => $product->id, 'status' => VoucherStatus::Available]);
-    }
+    Voucher::factory()->create(['product_id' => $local->id, 'city_id' => $cityA->id, 'status' => VoucherStatus::Available]);
+    Voucher::factory()->create(['product_id' => $other->id, 'city_id' => $cityB->id, 'status' => VoucherStatus::Available]);
+    Voucher::factory()->create(['product_id' => $unscoped->id, 'city_id' => null, 'status' => VoucherStatus::Available]);
 
     $response = $this->actingAs($outlet, 'sanctum')->getJson('/api/v1/products')->assertOk();
 
     $ids = collect($response->json('data'))->pluck('id');
 
     expect($ids)->toContain($local->id)
-        ->and($ids)->toContain($national->id)
+        ->and($ids)->not->toContain($unscoped->id)
         ->and($ids)->not->toContain($other->id);
+});
+
+test('outlets whose city_id is only on outlet_profile still get strictly filtered by that city', function () {
+    ['cityA' => $cityA, 'cityB' => $cityB] = twoCities();
+
+    $outlet = User::factory()->customer()->create(['city_id' => null]);
+    completeOutletProfile($outlet, $cityA);
+    // Simulate a legacy row where users.city_id was null while outlet_profiles.city_id was set
+    $outlet->update(['city_id' => null]);
+
+    $local = Product::factory()->create(['is_active' => true, 'city_id' => $cityA->id]);
+    $other = Product::factory()->create(['is_active' => true, 'city_id' => $cityB->id]);
+    $unscoped = Product::factory()->create(['is_active' => true, 'city_id' => null]);
+
+    Voucher::factory()->create(['product_id' => $local->id, 'city_id' => $cityA->id, 'status' => VoucherStatus::Available]);
+    Voucher::factory()->create(['product_id' => $other->id, 'city_id' => $cityB->id, 'status' => VoucherStatus::Available]);
+    Voucher::factory()->create(['product_id' => $unscoped->id, 'city_id' => null, 'status' => VoucherStatus::Available]);
+
+    $response = $this->actingAs($outlet->fresh(), 'sanctum')->getJson('/api/v1/products')->assertOk();
+
+    $ids = collect($response->json('data'))->pluck('id');
+
+    expect($ids)->toContain($local->id)
+        ->and($ids)->not->toContain($other->id)
+        ->and($ids)->not->toContain($unscoped->id);
 });
 
 test('guests still see the full catalog', function () {

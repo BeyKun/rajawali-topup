@@ -44,20 +44,18 @@ class KabupatenAdminController extends Controller
             ->paginate(20)
             ->withQueryString()
             ->through(function (User $admin): array {
-                $managedCities = $admin->cities->isNotEmpty()
-                    ? $admin->cities
-                    : ($admin->city ? collect([$admin->city]) : collect());
+                $city = $admin->city ?? $admin->cities->first();
 
                 return [
                     'id' => $admin->id,
                     'name' => $admin->name,
                     'email' => $admin->email,
-                    'province_id' => $admin->province_id,
-                    'province_name' => $admin->city?->province?->name ?? $managedCities->first()?->province?->name,
-                    'city_id' => $admin->city_id,
-                    'city_name' => $admin->city?->name,
-                    'city_ids' => $managedCities->pluck('id')->map(fn ($id) => (int) $id)->all(),
-                    'city_names' => $managedCities->pluck('name')->join(', '),
+                    'province_id' => $admin->province_id ?? $city?->province_id,
+                    'province_name' => $city?->province?->name,
+                    'city_id' => $city?->id,
+                    'city_name' => $city?->name,
+                    'city_ids' => $city ? [(int) $city->id] : [],
+                    'city_names' => $city?->name ?? '',
                     'created_at' => $admin->created_at?->toIso8601String(),
                 ];
             });
@@ -82,7 +80,7 @@ class KabupatenAdminController extends Controller
     }
 
     /**
-     * Create a new kabupaten admin account.
+     * Create a new kabupaten admin account (1 admin = 1 kabupaten/kota).
      */
     public function store(Request $request): RedirectResponse
     {
@@ -91,22 +89,24 @@ class KabupatenAdminController extends Controller
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')],
             'password' => ['required', 'string', Password::defaults()],
             'province_id' => ['nullable', 'integer', Rule::exists('provinces', 'id')],
-            'city_ids' => ['nullable', 'array'],
-            'city_ids.*' => ['integer', Rule::exists('cities', 'id')],
             'city_id' => ['nullable', 'integer', Rule::exists('cities', 'id')],
+            'city_ids' => ['nullable', 'array', 'max:1'],
+            'city_ids.*' => ['integer', Rule::exists('cities', 'id')],
+        ], [
+            'city_ids.max' => 'Satu admin wilayah hanya dapat mengelola satu kabupaten/kota.',
         ]);
 
-        $cityIds = ! empty($validated['city_ids'])
-            ? array_values(array_unique(array_map('intval', $validated['city_ids'])))
-            : (! empty($validated['city_id']) ? [(int) $validated['city_id']] : []);
+        $cityId = ! empty($validated['city_id'])
+            ? (int) $validated['city_id']
+            : (! empty($validated['city_ids'][0]) ? (int) $validated['city_ids'][0] : null);
 
-        if (empty($cityIds)) {
+        if ($cityId === null) {
             throw ValidationException::withMessages([
-                'city_ids' => 'Pilih minimal satu wilayah kabupaten/kota.',
+                'city_id' => 'Pilih satu wilayah kabupaten/kota yang dikelola.',
             ]);
         }
 
-        $primaryCity = City::query()->find($cityIds[0]);
+        $primaryCity = City::query()->find($cityId);
         $provinceId = $validated['province_id'] ?? $primaryCity?->province_id;
 
         $admin = User::query()->create([
@@ -115,11 +115,11 @@ class KabupatenAdminController extends Controller
             'password' => Hash::make($validated['password']),
             'role' => UserRole::KabupatenAdmin,
             'province_id' => $provinceId,
-            'city_id' => $cityIds[0],
+            'city_id' => $cityId,
             'email_verified_at' => now(),
         ]);
 
-        $admin->cities()->sync($cityIds);
+        $admin->cities()->sync([$cityId]);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Admin wilayah berhasil dibuat.']);
 
@@ -127,7 +127,7 @@ class KabupatenAdminController extends Controller
     }
 
     /**
-     * Update a kabupaten admin account and its assigned regions.
+     * Update a kabupaten admin account and its assigned single region.
      */
     public function update(Request $request, User $admin): RedirectResponse
     {
@@ -138,29 +138,31 @@ class KabupatenAdminController extends Controller
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($admin->id)],
             'password' => ['nullable', 'string', Password::defaults()],
             'province_id' => ['nullable', 'integer', Rule::exists('provinces', 'id')],
-            'city_ids' => ['nullable', 'array'],
-            'city_ids.*' => ['integer', Rule::exists('cities', 'id')],
             'city_id' => ['nullable', 'integer', Rule::exists('cities', 'id')],
+            'city_ids' => ['nullable', 'array', 'max:1'],
+            'city_ids.*' => ['integer', Rule::exists('cities', 'id')],
+        ], [
+            'city_ids.max' => 'Satu admin wilayah hanya dapat mengelola satu kabupaten/kota.',
         ]);
 
-        $cityIds = ! empty($validated['city_ids'])
-            ? array_values(array_unique(array_map('intval', $validated['city_ids'])))
-            : (! empty($validated['city_id']) ? [(int) $validated['city_id']] : []);
+        $cityId = ! empty($validated['city_id'])
+            ? (int) $validated['city_id']
+            : (! empty($validated['city_ids'][0]) ? (int) $validated['city_ids'][0] : null);
 
-        if (empty($cityIds)) {
+        if ($cityId === null) {
             throw ValidationException::withMessages([
-                'city_ids' => 'Pilih minimal satu wilayah kabupaten/kota.',
+                'city_id' => 'Pilih satu wilayah kabupaten/kota yang dikelola.',
             ]);
         }
 
-        $primaryCity = City::query()->find($cityIds[0]);
+        $primaryCity = City::query()->find($cityId);
         $provinceId = $validated['province_id'] ?? $primaryCity?->province_id ?? $admin->province_id;
 
         $admin->fill([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'province_id' => $provinceId,
-            'city_id' => $cityIds[0],
+            'city_id' => $cityId,
         ]);
 
         if (! empty($validated['password'])) {
@@ -168,7 +170,7 @@ class KabupatenAdminController extends Controller
         }
 
         $admin->save();
-        $admin->cities()->sync($cityIds);
+        $admin->cities()->sync([$cityId]);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Admin wilayah berhasil diperbarui.']);
 

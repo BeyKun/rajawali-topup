@@ -14,6 +14,8 @@ beforeEach(function () {
     $this->withoutVite();
     config(['telkomsel.mock' => true]);
     $this->admin = User::factory()->admin()->create();
+    $this->province = Province::create(['code' => '99', 'name' => 'Provinsi Default']);
+    $this->city = City::create(['province_id' => $this->province->id, 'province_code' => '99', 'code' => '99.01', 'name' => 'Kota Default']);
 });
 
 test('voucher create page renders without a product select', function () {
@@ -50,6 +52,7 @@ test('a valid voucher is stored as available with an encrypted hrn and auto-crea
             'serial_number' => $serial,
             'hrn' => $hrn,
             'sell_price' => 25000,
+            'city_ids' => [$this->city->id],
         ])
         ->assertRedirect('/admin/vouchers');
 
@@ -79,6 +82,7 @@ test('a valid 15-digit voucher input is truncated to 12 digits', function () {
             'serial_number' => '5007 3033 2927 269',
             'hrn' => '92225 41469 04477 97',
             'sell_price' => 25000,
+            'city_ids' => [$this->city->id],
         ])
         ->assertRedirect('/admin/vouchers');
 
@@ -102,6 +106,7 @@ test('two vouchers of the same package share one auto-generated product', functi
                 'serial_number' => $serial,
                 'hrn' => $hrn,
                 'sell_price' => 25000,
+                'city_ids' => [$this->city->id],
             ])
             ->assertRedirect('/admin/vouchers');
     }
@@ -115,8 +120,21 @@ test('the sell price is required', function () {
         ->post('/admin/vouchers', [
             'serial_number' => '300338120354',
             'hrn' => '71125613431848001',
+            'city_ids' => [$this->city->id],
         ])
         ->assertSessionHasErrors('sell_price');
+
+    expect(Voucher::query()->count())->toBe(0);
+});
+
+test('super admin voucher input requires city_ids', function () {
+    $this->actingAs($this->admin)
+        ->post('/admin/vouchers', [
+            'serial_number' => '300338120354',
+            'hrn' => '71125613431848001',
+            'sell_price' => 25000,
+        ])
+        ->assertSessionHasErrors('city_ids');
 
     expect(Voucher::query()->count())->toBe(0);
 });
@@ -137,6 +155,7 @@ test('an invalid or used voucher is rejected', function () {
             'serial_number' => '300338120999',
             'hrn' => '71125613431848099',
             'sell_price' => 25000,
+            'city_ids' => [$this->city->id],
         ])
         ->assertSessionHasErrors('serial_number');
 
@@ -208,7 +227,7 @@ test('super admin sees is_super_admin and cities props on create page', function
         ->assertInertia(fn (AssertableInertia $page) => $page
             ->component('admin/vouchers/Create')
             ->where('is_super_admin', true)
-            ->has('cities', 1)
+            ->has('cities', 2)
         );
 });
 
@@ -251,6 +270,7 @@ test('voucher input applies margin percentage to calculate final mobile sell pri
             'hrn' => $hrn,
             'sell_price' => 10000,
             'margin_percentage' => 2,
+            'city_ids' => [$this->city->id],
         ])
         ->assertRedirect('/admin/vouchers');
 

@@ -319,6 +319,11 @@ function submitEdit(): void {
         return;
     }
 
+    if (props.is_super_admin && (!editForm.city_ids || editForm.city_ids.length === 0)) {
+        editForm.setError('city_ids', 'Wilayah berlaku wajib dipilih minimal satu kabupaten/kota.');
+        return;
+    }
+
     editForm.transform((data) => ({
         ...data,
         product_id: selectedProductOption.value !== 'manual' ? data.product_id : null,
@@ -836,7 +841,10 @@ function submitEdit(): void {
                     </div>
 
                     <div v-if="props.is_super_admin" class="grid gap-2">
-                        <Label>Wilayah Berlaku</Label>
+                        <Label>
+                            Wilayah Berlaku
+                            <span class="text-destructive">*</span>
+                        </Label>
                         <SearchableCityMultiSelect
                             v-model="editForm.city_ids"
                             :cities="props.cities || []"
@@ -844,7 +852,7 @@ function submitEdit(): void {
                         />
                         <InputError :message="editForm.errors.city_ids" />
                         <p class="text-xs text-muted-foreground">
-                            Pilih kabupaten/kota yang dapat menjual voucher ini.
+                            Wajib pilih minimal satu kabupaten/kota yang dapat menjual voucher ini.
                         </p>
                     </div>
 

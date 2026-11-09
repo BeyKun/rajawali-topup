@@ -72,15 +72,25 @@ function something()
 /**
  * Attach a complete outlet profile to a customer so order endpoints are usable.
  */
-function completeOutletProfile(User $user): OutletProfile
+function completeOutletProfile(User $user, ?City $city = null): OutletProfile
 {
     static $counter = 0;
     $counter++;
 
-    $province = Province::create(['code' => '11', 'name' => 'Aceh '.$counter]);
-    $city = City::create(['province_id' => $province->id, 'province_code' => '11', 'code' => '11.'.$counter, 'name' => 'Aceh Selatan '.$counter]);
-    $district = District::create(['city_id' => $city->id, 'city_code' => '11.'.$counter, 'code' => '11.'.$counter.'.01', 'name' => 'Bakongan '.$counter]);
-    $village = Village::create(['district_id' => $district->id, 'district_code' => '11.'.$counter.'.01', 'code' => '11.'.$counter.'.01.2001', 'name' => 'Keude '.$counter]);
+    if ($city === null) {
+        $province = Province::create(['code' => '11', 'name' => 'Aceh '.$counter]);
+        $city = City::create(['province_id' => $province->id, 'province_code' => '11', 'code' => '11.'.$counter, 'name' => 'Aceh Selatan '.$counter]);
+    } else {
+        $province = $city->province;
+    }
+
+    $district = District::create(['city_id' => $city->id, 'city_code' => $city->code, 'code' => $city->code.'.01.'.$counter, 'name' => 'Bakongan '.$counter]);
+    $village = Village::create(['district_id' => $district->id, 'district_code' => $district->code, 'code' => $district->code.'.2001', 'name' => 'Keude '.$counter]);
+
+    $user->update([
+        'province_id' => $province->id,
+        'city_id' => $city->id,
+    ]);
 
     return OutletProfile::create([
         'user_id' => $user->id,

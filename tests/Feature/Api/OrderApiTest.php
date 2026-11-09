@@ -25,14 +25,18 @@ beforeEach(function () {
  */
 function sellableProduct(int $stock = 1): Product
 {
+    $cityId = test()->user?->effectiveCityId();
+
     $product = Product::factory()->create([
         'is_active' => true,
         'sell_price' => 25000,
+        'city_id' => $cityId,
     ]);
 
     Voucher::factory()->count($stock)->create([
         'product_id' => $product->id,
         'status' => VoucherStatus::Available,
+        'city_id' => $cityId,
     ]);
 
     return $product;

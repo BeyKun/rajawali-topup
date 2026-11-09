@@ -65,12 +65,13 @@ class OrderService
 
         $order = DB::transaction(function () use ($user, $productId, $normalizedMsisdn, $promoCode): Order {
             $product = Product::query()->findOrFail($productId);
+            $cityId = $user->effectiveCityId();
 
             /** @var Voucher|null $voucher */
             $voucher = Voucher::query()
                 ->where('product_id', $productId)
                 ->where('status', VoucherStatus::Available)
-                ->when($user->city_id, fn ($q) => $q->forCity($user->city_id))
+                ->when($cityId !== null, fn ($q) => $q->forCity($cityId))
                 ->lockForUpdate()
                 ->first();
 

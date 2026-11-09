@@ -44,6 +44,7 @@ class VoucherController extends Controller
         ];
 
         $isSuperAdmin = (bool) $request->user()?->isSuperAdmin();
+        $cityIds = $request->user()?->isKabupatenAdmin() ? $request->user()->managedCityIds() : null;
         $cities = $isSuperAdmin
             ? City::query()
                 ->with('province:id,name')
@@ -59,7 +60,7 @@ class VoucherController extends Controller
 
         $vouchers = Voucher::query()
             ->with(['product:id,name,quota_description,sell_price,hpp_price', 'cities:id'])
-            ->forCity($request->user()?->isKabupatenAdmin() ? $request->user()->managedCityIds() : null)
+            ->forCity($cityIds)
             ->when($filters['status'], fn (Builder $query, string $status) => $query->where('status', $status))
             ->when($filters['search'], function (Builder $query, string $search): void {
                 $query->where(function (Builder $inner) use ($search): void {
@@ -95,10 +96,7 @@ class VoucherController extends Controller
             ]);
 
         $products = Product::query()
-            ->when(! empty($cityIds), fn (Builder $q) => $q->where(fn (Builder $inner) => $inner
-                ->whereIn('city_id', $cityIds)
-                ->orWhereNull('city_id')
-            ))
+            ->forCity($cityIds)
             ->withCount('vouchers')
             ->orderByDesc('vouchers_count')
             ->orderBy('name')
@@ -116,7 +114,7 @@ class VoucherController extends Controller
         return Inertia::render('admin/vouchers/Index', [
             'vouchers' => $vouchers,
             'filters' => $filters,
-            'statusCounts' => $this->statusCounts($request->user()?->isKabupatenAdmin() ? $request->user()->managedCityIds() : null),
+            'statusCounts' => $this->statusCounts($cityIds),
             'is_super_admin' => $isSuperAdmin,
             'cities' => $cities,
             'products' => $products,
@@ -261,7 +259,7 @@ class VoucherController extends Controller
         }
         $voucher->status = VoucherStatus::from($request->string('status')->toString());
 
-        if ($request->user()?->isSuperAdmin()) {
+        if ($request->user()?->isSuperAdmin() && $request->has('city_ids')) {
             $cityIds = array_values(array_unique(array_filter(array_map('intval', (array) $request->input('city_ids', [])))));
             $voucher->cities()->sync($cityIds);
             $voucher->city_id = count($cityIds) === 1 ? $cityIds[0] : null;
@@ -368,10 +366,7 @@ class VoucherController extends Controller
         $cityIds = $request->user()?->isKabupatenAdmin() ? $request->user()->managedCityIds() : null;
 
         $products = Product::query()
-            ->when(! empty($cityIds), fn (Builder $q) => $q->where(fn (Builder $inner) => $inner
-                ->whereIn('city_id', $cityIds)
-                ->orWhereNull('city_id')
-            ))
+            ->forCity($cityIds)
             ->withCount('vouchers')
             ->orderByDesc('vouchers_count')
             ->orderBy('name')
@@ -414,7 +409,7 @@ class VoucherController extends Controller
         ];
 
         if ($request->user()?->isSuperAdmin()) {
-            $rules['city_ids'] = ['nullable', 'array'];
+            $rules['city_ids'] = ['required', 'array', 'min:1'];
             $rules['city_ids.*'] = ['integer', 'exists:cities,id'];
         }
 
@@ -422,6 +417,8 @@ class VoucherController extends Controller
             'rows.*.sell_price.gt' => 'Harga jual voucher tidak boleh 0 atau kurang. Silakan atur harga untuk setiap baris voucher.',
             'rows.*.sell_price.required_with' => 'Harga jual voucher wajib diisi.',
             'rows.*.sell_price.numeric' => 'Harga jual voucher harus berupa angka.',
+            'city_ids.required' => 'Wilayah berlaku wajib dipilih minimal satu kabupaten/kota.',
+            'city_ids.min' => 'Wilayah berlaku wajib dipilih minimal satu kabupaten/kota.',
         ];
 
         $validated = $request->validate($rules, $messages);

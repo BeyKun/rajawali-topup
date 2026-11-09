@@ -1,6 +1,8 @@
 <?php
 
 use App\Jobs\ValidateVoucherBatchJob;
+use App\Models\City;
+use App\Models\Province;
 use App\Models\User;
 use Illuminate\Support\Facades\Queue;
 
@@ -8,9 +10,12 @@ it('accepts bulk voucher import from scanned rows array', function () {
     Queue::fake();
 
     $admin = User::factory()->admin()->create();
+    $province = Province::create(['code' => '11', 'name' => 'Aceh']);
+    $city = City::create(['province_id' => $province->id, 'province_code' => '11', 'code' => '11.01', 'name' => 'Aceh Selatan']);
 
     $response = $this->actingAs($admin)
         ->post(route('admin.vouchers.bulk.store'), [
+            'city_ids' => [$city->id],
             'rows' => [
                 [
                     'serial_number' => '3003 3812 0354 186',

@@ -121,6 +121,11 @@ function submit(): void {
         return;
     }
 
+    if (props.is_super_admin && form.city_ids.length === 0) {
+        form.setError('city_ids', 'Wilayah berlaku wajib dipilih minimal satu kabupaten/kota.');
+        return;
+    }
+
     form.transform((data) => ({
         ...data,
         serial_number: cleanDigits(data.serial_number),
@@ -220,7 +225,7 @@ function submit(): void {
                 </div>
 
                 <div v-if="props.is_super_admin" class="grid gap-2">
-                    <Label>Wilayah Berlaku</Label>
+                    <Label>Wilayah Berlaku <span class="text-destructive">*</span></Label>
                     <SearchableCityMultiSelect
                         v-model="form.city_ids"
                         :cities="props.cities || []"
@@ -228,7 +233,7 @@ function submit(): void {
                     />
                     <InputError :message="form.errors.city_ids" />
                     <p class="text-xs text-muted-foreground">
-                        Pilih kabupaten/kota yang dapat menjual voucher ini. Jika tidak memilih, sistem otomatis mendeteksi berdasarkan zona Telkomsel.
+                        Wajib memilih minimal satu kabupaten/kota yang dapat menjual voucher ini.
                     </p>
                 </div>
 

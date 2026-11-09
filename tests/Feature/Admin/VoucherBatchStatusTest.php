@@ -1,6 +1,8 @@
 <?php
 
 use App\Jobs\ValidateVoucherBatchJob;
+use App\Models\City;
+use App\Models\Province;
 use App\Models\User;
 use App\Models\Voucher;
 use Illuminate\Support\Facades\Cache;
@@ -9,11 +11,14 @@ beforeEach(function () {
     $this->withoutVite();
     config(['telkomsel.mock' => true]);
     $this->admin = User::factory()->admin()->create();
+    $province = Province::create(['code' => '11', 'name' => 'Aceh']);
+    $this->city = City::create(['province_id' => $province->id, 'province_code' => '11', 'code' => '11.01', 'name' => 'Aceh Selatan']);
 });
 
 test('bulk store creates batch in cache and returns batch_id in json response', function () {
     $response = $this->actingAs($this->admin)
         ->postJson(route('admin.vouchers.bulk.store'), [
+            'city_ids' => [$this->city->id],
             'rows' => [
                 [
                     'serial_number' => '300338120354',

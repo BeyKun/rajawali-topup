@@ -1,6 +1,8 @@
 <?php
 
 use App\Jobs\ValidateVoucherBatchJob;
+use App\Models\City;
+use App\Models\Province;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
@@ -104,6 +106,8 @@ it('dispatches bulk store job with the extracted 5 vouchers from sample image', 
     Queue::fake();
 
     $admin = User::factory()->admin()->create();
+    $province = Province::create(['code' => '11', 'name' => 'Aceh']);
+    $city = City::create(['province_id' => $province->id, 'province_code' => '11', 'code' => '11.01', 'name' => 'Aceh Selatan']);
 
     $extractedRows = [
         [
@@ -135,6 +139,7 @@ it('dispatches bulk store job with the extracted 5 vouchers from sample image', 
 
     $response = $this->actingAs($admin)
         ->post(route('admin.vouchers.bulk.store'), [
+            'city_ids' => [$city->id],
             'rows' => $extractedRows,
             'margin_percentage' => 0,
         ]);

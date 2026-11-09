@@ -103,12 +103,19 @@ class Order extends Model
      */
     public function scopeForCity(Builder $query, int|array|null $cityId): Builder
     {
-        if ($cityId === null || (is_array($cityId) && empty($cityId))) {
+        if ($cityId === null) {
             return $query;
+        }
+
+        if (is_array($cityId) && empty($cityId)) {
+            return $query->whereRaw('1 = 0');
         }
 
         $cityIds = is_array($cityId) ? $cityId : [$cityId];
 
-        return $query->whereHas('product', fn ($product) => $product->whereIn('city_id', $cityIds));
+        return $query->where(function (Builder $q) use ($cityIds): void {
+            $q->whereHas('product', fn (Builder $product) => $product->whereIn('products.city_id', $cityIds))
+                ->orWhereHas('voucher', fn (Builder $voucher) => $voucher->forCity($cityIds));
+        });
     }
 }
