@@ -55,7 +55,10 @@ class OutletUserController extends Controller
                 $query->where(function (Builder $inner) use ($term): void {
                     $inner->where('name', 'like', "%{$term}%")
                         ->orWhere('phone', 'like', "%{$term}%")
-                        ->orWhereHas('outletProfile', fn (Builder $profile) => $profile->where('outlet_name', 'like', "%{$term}%"));
+                        ->orWhereHas('outletProfile', fn (Builder $profile) => $profile
+                            ->where('outlet_name', 'like', "%{$term}%")
+                            ->orWhere('outlet_id', 'like', "%{$term}%")
+                        );
                 });
             })
             ->when($filters['city_id'], function (Builder $query, int $cityId): void {
@@ -162,6 +165,7 @@ class OutletUserController extends Controller
 
         return [
             'id' => $user->id,
+            'outlet_id' => $profile?->outlet_id,
             'name' => $user->name,
             'phone' => $user->phone,
             'outlet_name' => $profile?->outlet_name,
@@ -187,6 +191,7 @@ class OutletUserController extends Controller
     protected function profileAttributes(array $validated): array
     {
         return [
+            'outlet_id' => $validated['outlet_id'],
             'outlet_name' => $validated['outlet_name'],
             'whatsapp' => $validated['whatsapp'] ?? $validated['phone'],
             'province_id' => $validated['province_id'],

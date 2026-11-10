@@ -24,13 +24,19 @@ class OutletUserRequest extends FormRequest
     }
 
     /**
-     * Normalize the phone number before validation.
+     * Normalize the phone number and outlet ID before validation.
      */
     protected function prepareForValidation(): void
     {
-        $this->merge([
+        $merge = [
             'phone' => Phone::normalizeTo62((string) $this->input('phone')),
-        ]);
+        ];
+
+        if ($this->has('outlet_id')) {
+            $merge['outlet_id'] = trim((string) $this->input('outlet_id'));
+        }
+
+        $this->merge($merge);
     }
 
     /**
@@ -40,16 +46,23 @@ class OutletUserRequest extends FormRequest
      */
     public function rules(): array
     {
-        /** @var User|null $user */
+        /** @var User|int|string|null $user */
         $user = $this->route('user');
+        $userId = $user instanceof User ? $user->id : $user;
 
         return [
+            'outlet_id' => [
+                'required',
+                'string',
+                'max:100',
+                Rule::unique('outlet_profiles', 'outlet_id')->ignore($userId, 'user_id'),
+            ],
             'name' => ['required', 'string', 'max:255'],
             'phone' => [
                 'required',
                 'string',
                 new IndonesianPhoneNumber,
-                Rule::unique('users', 'phone')->ignore($user?->id),
+                Rule::unique('users', 'phone')->ignore($userId),
             ],
             'outlet_name' => ['required', 'string', 'max:150'],
             'whatsapp' => ['nullable', 'string', 'max:20'],
@@ -69,6 +82,9 @@ class OutletUserRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'outlet_id.required' => 'ID Outlet wajib diisi.',
+            'outlet_id.max' => 'ID Outlet maksimal 100 karakter.',
+            'outlet_id.unique' => 'ID Outlet ini sudah terdaftar pada outlet lain.',
             'name.required' => 'Nama pemilik wajib diisi.',
             'phone.required' => 'Nomor HP wajib diisi.',
             'phone.unique' => 'Nomor HP ini sudah terdaftar pada akun lain.',

@@ -10,6 +10,7 @@ use Illuminate\Support\Carbon;
 /**
  * @property int $id
  * @property int $user_id
+ * @property string|null $outlet_id
  * @property string $outlet_name
  * @property string $whatsapp
  * @property int $province_id
@@ -20,7 +21,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['user_id', 'outlet_name', 'whatsapp', 'province_id', 'city_id', 'district_id', 'village_id', 'address'])]
+#[Fillable(['user_id', 'outlet_id', 'outlet_name', 'whatsapp', 'province_id', 'city_id', 'district_id', 'village_id', 'address'])]
 class OutletProfile extends Model
 {
     /**

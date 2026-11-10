@@ -94,6 +94,7 @@ function completeOutletProfile(User $user, ?City $city = null): OutletProfile
 
     return OutletProfile::create([
         'user_id' => $user->id,
+        'outlet_id' => 'OUT-'.str_pad((string) $counter, 4, '0', STR_PAD_LEFT),
         'outlet_name' => 'Konter '.$counter,
         'whatsapp' => '08120000'.$counter,
         'province_id' => $province->id,

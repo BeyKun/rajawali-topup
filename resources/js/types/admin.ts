@@ -201,6 +201,7 @@ export type AdminKabupatenAdminRow = {
 
 export type AdminOutletRow = {
     id: number;
+    outlet_id: string | null;
     name: string;
     phone: string | null;
     outlet_name: string | null;

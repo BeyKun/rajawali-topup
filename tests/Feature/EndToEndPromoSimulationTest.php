@@ -59,6 +59,7 @@ test('an admin-provisioned outlet checks out with a promo voucher end to end', f
     // 1. Admin provisions a new outlet user (default password) for a region.
     $this->actingAs($this->admin)
         ->post('/admin/outlets', [
+            'outlet_id' => 'OUT-BUDI-001',
             'name' => 'Budi Outlet',
             'phone' => '081200000001',
             'outlet_name' => 'Konter Budi',

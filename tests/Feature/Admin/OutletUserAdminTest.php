@@ -34,6 +34,7 @@ function outletPayload(array $overrides = []): array
     $phone = '0812'.str_pad((string) $counter, 7, '0', STR_PAD_LEFT);
 
     return array_merge([
+        'outlet_id' => 'OUT-'.str_pad((string) $counter, 4, '0', STR_PAD_LEFT),
         'name' => 'Pemilik '.$counter,
         'phone' => $phone,
         'outlet_name' => 'Konter '.$counter,
@@ -61,8 +62,10 @@ test('the outlet index lists only customer accounts', function () {
         );
 });
 
-test('an admin can create an outlet user with the default password', function () {
-    $payload = outletPayload();
+test('an admin can create an outlet user with the default password and custom freetext outlet_id', function () {
+    $payload = outletPayload([
+        'outlet_id' => 'RAJ-OUT-007',
+    ]);
 
     $this->actingAs($this->admin)
         ->post('/admin/outlets', $payload)
@@ -73,7 +76,38 @@ test('an admin can create an outlet user with the default password', function ()
     expect($user->role)->toBe(UserRole::Customer)
         ->and($user->email)->toBeNull()
         ->and(Hash::check('rajawali123', $user->password))->toBeTrue()
+        ->and($user->outletProfile?->outlet_id)->toBe('RAJ-OUT-007')
         ->and($user->outletProfile?->outlet_name)->toBe($payload['outlet_name']);
+});
+
+test('an outlet requires a unique freetext outlet_id', function () {
+    $payload1 = outletPayload(['outlet_id' => 'OUT-DUP-01']);
+    $this->actingAs($this->admin)->post('/admin/outlets', $payload1)->assertRedirect('/admin/outlets');
+
+    // Missing outlet_id
+    $this->actingAs($this->admin)
+        ->post('/admin/outlets', outletPayload(['outlet_id' => '']))
+        ->assertSessionHasErrors('outlet_id');
+
+    // Duplicate outlet_id
+    $this->actingAs($this->admin)
+        ->post('/admin/outlets', outletPayload(['outlet_id' => 'OUT-DUP-01']))
+        ->assertSessionHasErrors('outlet_id');
+});
+
+test('outlet index search filters by outlet_id', function () {
+    $payload = outletPayload(['outlet_id' => 'KODE-KHUSUS-99', 'name' => 'Pemilik Unik']);
+    $this->actingAs($this->admin)->post('/admin/outlets', $payload)->assertRedirect('/admin/outlets');
+
+    $response = $this->actingAs($this->admin)
+        ->get('/admin/outlets?search=KODE-KHUSUS')
+        ->assertOk();
+
+    $response->assertInertia(fn (AssertableInertia $page) => $page
+        ->component('admin/outlets/Index')
+        ->has('outlets.data', 1)
+        ->where('outlets.data.0.outlet_id', 'KODE-KHUSUS-99')
+    );
 });
 
 test('the outlet phone number is normalized to 628 format', function () {
@@ -103,6 +137,7 @@ test('an outlet without a name or outlet name is rejected', function () {
 test('an admin can update an outlet user and their profile', function () {
     $outlet = User::factory()->customer()->create(['name' => 'Lama', 'phone' => '6281111111111']);
     $outlet->outletProfile()->create([
+        'outlet_id' => 'OUT-LAMA',
         'outlet_name' => 'Konter Lama',
         'whatsapp' => '6281111111111',
         'province_id' => $this->province->id,
@@ -112,18 +147,22 @@ test('an admin can update an outlet user and their profile', function () {
         'address' => 'Alamat Lama',
     ]);
 
+    $updatePayload = outletPayload([
+        'outlet_id' => 'OUT-BARU',
+        'name' => 'Baru',
+        'phone' => '081200007777',
+        'outlet_name' => 'Konter Baru',
+    ]);
+
     $this->actingAs($this->admin)
-        ->put("/admin/outlets/{$outlet->id}", outletPayload([
-            'name' => 'Baru',
-            'phone' => '081200007777',
-            'outlet_name' => 'Konter Baru',
-        ]))
+        ->put("/admin/outlets/{$outlet->id}", $updatePayload)
         ->assertRedirect('/admin/outlets');
 
     $outlet->refresh();
 
     expect($outlet->name)->toBe('Baru')
         ->and($outlet->phone)->toBe('6281200007777')
+        ->and($outlet->outletProfile?->outlet_id)->toBe('OUT-BARU')
         ->and($outlet->outletProfile?->outlet_name)->toBe('Konter Baru');
 });
 

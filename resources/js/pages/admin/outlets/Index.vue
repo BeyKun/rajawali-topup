@@ -43,6 +43,7 @@ const editing = ref<AdminOutletRow | null>(null);
 const showDialog = ref(false);
 
 const form = useForm({
+    outlet_id: '',
     name: '',
     phone: '',
     outlet_name: '',
@@ -75,6 +76,7 @@ function openCreate(): void {
 function openEdit(outlet: AdminOutletRow): void {
     editing.value = outlet;
     form.clearErrors();
+    form.outlet_id = outlet.outlet_id ?? '';
     form.name = outlet.name;
     form.phone = outlet.phone ?? '';
     form.outlet_name = outlet.outlet_name ?? '';
@@ -157,7 +159,7 @@ function submitReset(): void {
                         id="search"
                         v-model="filterState.search"
                         class="pl-8"
-                        placeholder="Nama, nomor HP, atau nama outlet"
+                        placeholder="Cari ID Outlet, nama, nomor HP, atau nama outlet"
                     />
                 </div>
             </div>
@@ -182,6 +184,7 @@ function submitReset(): void {
             <table class="w-full text-sm">
                 <thead class="bg-muted/50 text-left">
                     <tr>
+                        <th class="px-4 py-3 font-medium">ID Outlet</th>
                         <th class="px-4 py-3 font-medium">Nama Outlet</th>
                         <th class="px-4 py-3 font-medium">Pemilik</th>
                         <th class="px-4 py-3 font-medium">No HP</th>
@@ -196,6 +199,9 @@ function submitReset(): void {
                         :key="outlet.id"
                         class="border-t"
                     >
+                        <td class="px-4 py-3 font-mono text-xs font-semibold text-primary">
+                            {{ outlet.outlet_id ?? '-' }}
+                        </td>
                         <td class="px-4 py-3 font-medium">
                             {{ outlet.outlet_name ?? '-' }}
                         </td>
@@ -232,7 +238,7 @@ function submitReset(): void {
                     </tr>
                     <tr v-if="props.outlets.data.length === 0">
                         <td
-                            colspan="6"
+                            colspan="7"
                             class="px-4 py-12 text-center text-muted-foreground"
                         >
                             <Store class="mx-auto mb-2 size-8 opacity-40" />
@@ -263,13 +269,32 @@ function submitReset(): void {
 
                 <div class="grid gap-4">
                     <div class="grid gap-2">
-                        <Label for="name">Nama Pemilik</Label>
+                        <Label for="outlet_id">
+                            ID Outlet
+                            <span class="text-destructive">*</span>
+                        </Label>
+                        <Input
+                            id="outlet_id"
+                            v-model="form.outlet_id"
+                            placeholder="Contoh: OUT-001, RJW-JKT-10, dll."
+                        />
+                        <InputError :message="form.errors.outlet_id" />
+                    </div>
+
+                    <div class="grid gap-2">
+                        <Label for="name">
+                            Nama Pemilik
+                            <span class="text-destructive">*</span>
+                        </Label>
                         <Input id="name" v-model="form.name" />
                         <InputError :message="form.errors.name" />
                     </div>
 
                     <div class="grid gap-2">
-                        <Label for="phone">Nomor HP (untuk login)</Label>
+                        <Label for="phone">
+                            Nomor HP (untuk login)
+                            <span class="text-destructive">*</span>
+                        </Label>
                         <Input
                             id="phone"
                             v-model="form.phone"
@@ -280,7 +305,10 @@ function submitReset(): void {
                     </div>
 
                     <div class="grid gap-2">
-                        <Label for="outlet_name">Nama Outlet</Label>
+                        <Label for="outlet_name">
+                            Nama Outlet
+                            <span class="text-destructive">*</span>
+                        </Label>
                         <Input id="outlet_name" v-model="form.outlet_name" />
                         <InputError :message="form.errors.outlet_name" />
                     </div>

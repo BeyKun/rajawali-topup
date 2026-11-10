@@ -70,6 +70,7 @@ class OutletProfileController extends Controller
         if ($profile === null) {
             return [
                 'profile_completed' => false,
+                'outlet_id' => null,
                 'outlet_name' => null,
                 'whatsapp' => null,
                 'province_id' => null,
@@ -88,6 +89,7 @@ class OutletProfileController extends Controller
 
         return [
             'profile_completed' => true,
+            'outlet_id' => $profile->outlet_id,
             'outlet_name' => $profile->outlet_name,
             'whatsapp' => $profile->whatsapp,
             'province_id' => $profile->province_id,
