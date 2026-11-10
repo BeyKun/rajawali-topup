@@ -27,6 +27,7 @@ class UserResource extends JsonResource
             'phone' => $this->phone,
             'avatar_url' => $this->avatar_url,
             'profile_completed' => $outlet !== null,
+            'outlet_id' => $outlet?->outlet_id,
             'outlet_name' => $outlet?->outlet_name,
             'whatsapp' => $outlet?->whatsapp,
             'province' => $outlet?->province?->name,
