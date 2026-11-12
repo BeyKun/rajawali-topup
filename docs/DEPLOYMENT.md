@@ -38,6 +38,11 @@ Everything is documented inline in `.env.example`.
 | `GOOGLE_MOCK` | `false` | **Mock must be off** |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | real OAuth credentials | Google sign-in |
 | `TELKOMSEL_MOCK` | `false` | **Mock must be off** — real voucher redeem |
+| `TELKOMSEL_GATEWAY_URL` | `http://telkomsel-gateway:8000` | Routes check/redeem through the anti-bot gateway (rate limit + captcha) |
+| `TELKOMSEL_GATEWAY_TOKEN` | random secret | Shared secret between Laravel and the gateway |
+| `TELKOMSEL_SOLVER_PROVIDER` | `2captcha` / `capsolver` | Solver used when Telkomsel returns `428 CAPTCHA_REQUIRED` |
+| `TELKOMSEL_SOLVER_API_KEY` | provider key | Solver credential; leave empty only if no captcha is expected |
+| `DB_QUEUE_RETRY_AFTER` / `REDIS_QUEUE_RETRY_AFTER` | `400` | Must exceed the 300s redeem job timeout |
 | `PAYMENT_PROVIDER` | `midtrans` | QRIS payment gateway |
 | `MIDTRANS_IS_PRODUCTION` | `true` | `false` = sandbox |
 | `MIDTRANS_SERVER_KEY` | `Mid-server-...` | Midtrans server key (Basic auth + signature) |
@@ -113,6 +118,11 @@ php artisan up
 
 Voucher redemption runs asynchronously via `ProcessVoucherRedeemJob`, so a worker
 **must** be running.
+
+The redeem job waits on the Telkomsel gateway (three requests per minute plus
+captcha solving), so `DB_QUEUE_RETRY_AFTER` / `REDIS_QUEUE_RETRY_AFTER` must stay
+above the job's 300-second timeout. Otherwise the same order can be redeemed
+twice by two workers.
 
 `/etc/supervisor/conf.d/rajawali-worker.conf`:
 

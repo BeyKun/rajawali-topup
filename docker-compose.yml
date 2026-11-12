@@ -7,6 +7,7 @@ services:
     restart: unless-stopped
     depends_on:
       - ocr-service
+      - telkomsel-gateway
     env_file:
       - .env
     environment:
@@ -29,6 +30,22 @@ services:
     restart: unless-stopped
     # ports:
     #   - "8000:8000"
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - nginx-proxy-manager_default
+
+  telkomsel-gateway:
+    build:
+      context: ./telkomsel-gateway
+      dockerfile: Dockerfile
+    container_name: rajawali_telkomsel_gateway
+    restart: unless-stopped
+    env_file:
+      - .env
+    # Internal only: never publish this port to the host.
+    # ports:
+    #   - "8010:8000"
     security_opt:
       - no-new-privileges:true
     networks:

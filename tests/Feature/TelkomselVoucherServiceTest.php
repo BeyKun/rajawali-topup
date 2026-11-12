@@ -216,3 +216,147 @@ test('redeem voucher normalizes a connection failure instead of throwing', funct
 
     expect(TelkomselApiLog::query()->where('endpoint', 'redeem')->count())->toBe(1);
 });
+
+test('check voucher is routed through the gateway when configured', function () {
+    config([
+        'telkomsel.mock' => false,
+        'telkomsel.gateway_url' => 'http://telkomsel-gateway:8000',
+        'telkomsel.gateway_token' => 'shared-secret',
+    ]);
+
+    Http::fake([
+        'http://telkomsel-gateway:8000/check' => Http::response([
+            'success' => true,
+            'upstream_status' => 200,
+            'payload' => [
+                'statusCode' => 1,
+                'statusMessage' => 'Tersedia',
+                'serialNumber' => '300338120354',
+                'name' => 'Internet',
+                'description' => 'Paket data',
+                'validity' => '5',
+                'expired_date' => '15-03-2027 14:55',
+                'region' => 'SIKKA',
+            ],
+            'meta' => [
+                'attempts' => 2,
+                'captcha' => 'google',
+                'solver' => '2captcha',
+                'proxy' => 'direct',
+                'duration_ms' => 8500,
+            ],
+        ]),
+    ]);
+
+    $result = app(TelkomselVoucherService::class)->checkVoucher('300338120354');
+
+    expect($result['is_valid'])->toBeTrue()
+        ->and($result['status_code'])->toBe(1)
+        ->and($result['status_message'])->toBe('Tersedia');
+
+    Http::assertSent(fn ($request) => $request->url() === 'http://telkomsel-gateway:8000/check'
+        && $request->hasHeader('X-Gateway-Token', 'shared-secret')
+        && $request['serial_number'] === '300338120354');
+
+    $log = TelkomselApiLog::query()->where('endpoint', 'check')->sole();
+
+    expect($log->response_code)->toBe(200)
+        ->and($log->request_payload['recaptcharesponse'])->toBe('[solved:google]')
+        ->and($log->request_payload['gateway_meta']['solver'])->toBe('2captcha');
+});
+
+test('check voucher maps a gateway rate limit to the retry message', function () {
+    config([
+        'telkomsel.mock' => false,
+        'telkomsel.gateway_url' => 'http://telkomsel-gateway:8000',
+    ]);
+
+    Http::fake([
+        'http://telkomsel-gateway:8000/check' => Http::response([
+            'success' => true,
+            'upstream_status' => 429,
+            'payload' => ['message' => 'Too Many Requests'],
+            'meta' => ['attempts' => 2, 'captcha' => 'none'],
+        ]),
+    ]);
+
+    $result = app(TelkomselVoucherService::class)->checkVoucher('300338120354');
+
+    expect($result['is_valid'])->toBeFalse()
+        ->and($result['status_code'])->toBe(429)
+        ->and($result['status_message'])->toBe('Gagal cek coba lagi');
+});
+
+test('check voucher reports a gateway solver failure without throwing', function () {
+    config([
+        'telkomsel.mock' => false,
+        'telkomsel.gateway_url' => 'http://telkomsel-gateway:8000',
+    ]);
+
+    Http::fake([
+        'http://telkomsel-gateway:8000/check' => Http::response([
+            'success' => false,
+            'upstream_status' => 428,
+            'payload' => [
+                'error' => [
+                    'code' => 'CAPTCHA_REQUIRED',
+                    'message' => 'TELKOMSEL_SOLVER_PROVIDER is not configured',
+                ],
+            ],
+            'meta' => ['attempts' => 1, 'captcha' => 'google'],
+        ]),
+    ]);
+
+    $result = app(TelkomselVoucherService::class)->checkVoucher('300338120354');
+
+    expect($result['is_valid'])->toBeFalse()
+        ->and($result['status_message'])->toContain('Gateway error')
+        ->and($result['status_message'])->toContain('TELKOMSEL_SOLVER_PROVIDER');
+});
+
+test('redeem voucher is routed through the gateway when configured', function () {
+    config([
+        'telkomsel.mock' => false,
+        'telkomsel.gateway_url' => 'http://telkomsel-gateway:8000',
+    ]);
+
+    Http::fake([
+        'http://telkomsel-gateway:8000/redeem' => Http::response([
+            'success' => true,
+            'upstream_status' => 200,
+            'payload' => [
+                'status' => true,
+                'message' => 200,
+                'data' => ['code' => '00', 'description' => 'Success'],
+            ],
+            'meta' => ['attempts' => 1, 'captcha' => 'none'],
+        ]),
+    ]);
+
+    $result = app(TelkomselVoucherService::class)->redeemVoucher('71125613431848001', '082233456777');
+
+    expect($result['success'])->toBeTrue()
+        ->and($result['code'])->toBe('00');
+
+    Http::assertSent(fn ($request) => $request->url() === 'http://telkomsel-gateway:8000/redeem'
+        && $request['hrn'] === '71125613431848001'
+        && $request['msisdn'] === '6282233456777');
+});
+
+test('gateway connection failure is normalized instead of throwing', function () {
+    config([
+        'telkomsel.mock' => false,
+        'telkomsel.gateway_url' => 'http://telkomsel-gateway:8000',
+    ]);
+
+    Http::fake([
+        'http://telkomsel-gateway:8000/check' => fn () => throw new ConnectionException('Gateway down'),
+    ]);
+
+    $result = app(TelkomselVoucherService::class)->checkVoucher('300338120354');
+
+    expect($result['is_valid'])->toBeFalse()
+        ->and($result['status_message'])->toContain('Connection');
+
+    expect(TelkomselApiLog::query()->where('endpoint', 'check')->count())->toBe(1);
+});

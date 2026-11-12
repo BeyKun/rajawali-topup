@@ -26,6 +26,12 @@ class ValidateVoucherBatchJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     /**
+     * Bulk imports stay inside the queue retry window. Enable per-row API
+     * validation through separate queued jobs rather than one long job.
+     */
+    public int $timeout = 300;
+
+    /**
      * @param  array<int, array{serial_number: string, hrn: string, sell_price: float, title?: string, description?: string}>  $rows
      * @param  array<int, int>  $cityIds
      */

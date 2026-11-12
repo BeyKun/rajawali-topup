@@ -86,6 +86,10 @@ class TelkomselVoucherService
             return $this->normalizeCheckResponse($data, $serialNumber);
         }
 
+        if ($this->gatewayEnabled()) {
+            return $this->checkVoucherViaGateway($serialNumber, $payload, $startTime);
+        }
+
         try {
             $response = $this->post('/check', $payload);
         } catch (ConnectionException $exception) {
@@ -144,6 +148,10 @@ class TelkomselVoucherService
             return $this->normalizeRedeemResponse($data, true);
         }
 
+        if ($this->gatewayEnabled()) {
+            return $this->redeemVoucherViaGateway($payload, $orderId, $voucherId, $startTime);
+        }
+
         try {
             $response = $this->post('/redeem', $payload);
         } catch (ConnectionException $exception) {
@@ -176,6 +184,142 @@ class TelkomselVoucherService
         }
 
         return $digits;
+    }
+
+    /**
+     * Check a voucher through the local anti-bot gateway.
+     *
+     * @param  array<array-key, mixed>  $payload
+     * @return array{is_valid: bool, status_code: int, status_message: string, serial_number: string, name: string, description: string, validity: string, expired_date: string, region: string, raw: array<array-key, mixed>}
+     */
+    protected function checkVoucherViaGateway(string $serialNumber, array $payload, float $startTime): array
+    {
+        try {
+            $envelope = $this->postToGateway('/check', ['serial_number' => $serialNumber]);
+        } catch (ConnectionException $exception) {
+            return $this->handleCheckConnectionFailure($payload, $exception, $startTime);
+        }
+
+        $status = (int) ($envelope['upstream_status'] ?? 0);
+        $data = $this->toArray($envelope['payload'] ?? []);
+        $meta = $this->toArray($envelope['meta'] ?? []);
+
+        $this->logApiCall('check', null, null, $this->gatewayAuditPayload($payload, $meta), $status, $data, $this->elapsedMs($startTime));
+
+        if (($envelope['success'] ?? true) === false) {
+            return $this->gatewayCheckFailure($serialNumber, $data);
+        }
+
+        if (in_array($status, [429, 403, 503], true)) {
+            return [
+                'is_valid' => false,
+                'status_code' => self::CHECK_STATUS_RATE_LIMIT,
+                'status_message' => 'Gagal cek coba lagi',
+                'serial_number' => $serialNumber,
+                'name' => '',
+                'description' => '',
+                'validity' => '',
+                'expired_date' => '',
+                'region' => '',
+                'raw' => $data !== [] ? $data : ['status' => $status],
+            ];
+        }
+
+        return $this->normalizeCheckResponse($data, $serialNumber);
+    }
+
+    /**
+     * Redeem a voucher through the local anti-bot gateway.
+     *
+     * @param  array<array-key, mixed>  $payload
+     * @return array{success: bool, code: string, description: string, raw: array<array-key, mixed>}
+     */
+    protected function redeemVoucherViaGateway(array $payload, ?int $orderId, ?int $voucherId, float $startTime): array
+    {
+        try {
+            $envelope = $this->postToGateway('/redeem', [
+                'hrn' => (string) ($payload['hrn'] ?? ''),
+                'msisdn' => (string) ($payload['msisdn'] ?? ''),
+            ]);
+        } catch (ConnectionException $exception) {
+            return $this->handleRedeemConnectionFailure($payload, $exception, $startTime, $orderId, $voucherId);
+        }
+
+        $status = (int) ($envelope['upstream_status'] ?? 0);
+        $data = $this->toArray($envelope['payload'] ?? []);
+        $meta = $this->toArray($envelope['meta'] ?? []);
+
+        $this->logApiCall('redeem', $orderId, $voucherId, $this->gatewayAuditPayload($payload, $meta), $status, $data, $this->elapsedMs($startTime));
+
+        if (($envelope['success'] ?? true) === false) {
+            return [
+                'success' => false,
+                'code' => 'ERROR',
+                'description' => $this->gatewayFailureMessage($data),
+                'raw' => $data,
+            ];
+        }
+
+        return $this->normalizeRedeemResponse($data, $status >= 200 && $status < 300);
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $data
+     * @return array{is_valid: bool, status_code: int, status_message: string, serial_number: string, name: string, description: string, validity: string, expired_date: string, region: string, raw: array<array-key, mixed>}
+     */
+    protected function gatewayCheckFailure(string $serialNumber, array $data): array
+    {
+        return [
+            'is_valid' => false,
+            'status_code' => self::CHECK_STATUS_INVALID,
+            'status_message' => $this->gatewayFailureMessage($data),
+            'serial_number' => $serialNumber,
+            'name' => '',
+            'description' => '',
+            'validity' => '',
+            'expired_date' => '',
+            'region' => '',
+            'raw' => $data,
+        ];
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $data
+     */
+    protected function gatewayFailureMessage(array $data): string
+    {
+        $message = $this->extractString($data['message'] ?? null);
+
+        if ($message === '') {
+            $message = $this->extractString($data['error'] ?? null);
+        }
+
+        return $message !== '' ? 'Gateway error: '.$message : 'Gateway unavailable';
+    }
+
+    /**
+     * Mark captcha usage in the audit payload without ever storing a live token.
+     *
+     * @param  array<array-key, mixed>  $payload
+     * @param  array<array-key, mixed>  $meta
+     * @return array<array-key, mixed>
+     */
+    protected function gatewayAuditPayload(array $payload, array $meta): array
+    {
+        $captcha = $this->extractString($meta['captcha'] ?? null, 'none');
+
+        if ($captcha !== '' && $captcha !== 'none') {
+            $payload['recaptcharesponse'] = '[solved:'.$captcha.']';
+        }
+
+        $payload['gateway_meta'] = [
+            'attempts' => (int) ($meta['attempts'] ?? 0),
+            'solver' => $this->extractString($meta['solver'] ?? null, 'none'),
+            'proxy' => $this->extractString($meta['proxy'] ?? null, 'direct'),
+            'duration_ms' => (int) ($meta['duration_ms'] ?? 0),
+        ];
+
+        return $payload;
     }
 
     /**
@@ -510,6 +654,55 @@ class TelkomselVoucherService
         ])
             ->timeout((int) config('telkomsel.timeout', 15))
             ->post($this->baseUrl().$path, $payload);
+    }
+
+    /**
+     * Send a request to the local anti-bot gateway.
+     *
+     * @param  array<array-key, mixed>  $payload
+     * @return array<array-key, mixed>
+     */
+    protected function postToGateway(string $path, array $payload): array
+    {
+        $response = Http::withHeaders([
+            'Content-Type' => 'application/json',
+            'Accept' => 'application/json',
+            'X-Gateway-Token' => (string) config('telkomsel.gateway_token', ''),
+        ])
+            ->timeout((int) config('telkomsel.gateway_timeout', 180))
+            ->post($this->gatewayUrl().$path, $payload);
+
+        $json = $response->json();
+
+        if (! is_array($json)) {
+            return [
+                'success' => false,
+                'upstream_status' => $response->status(),
+                'payload' => [
+                    'error' => 'Invalid gateway response',
+                    'body' => $response->body(),
+                ],
+                'meta' => [],
+            ];
+        }
+
+        return $json;
+    }
+
+    /**
+     * Whether check/redeem calls should be routed through the gateway.
+     */
+    protected function gatewayEnabled(): bool
+    {
+        return trim((string) config('telkomsel.gateway_url', '')) !== '';
+    }
+
+    /**
+     * Resolve the gateway base URL at call time so tests can override the config.
+     */
+    protected function gatewayUrl(): string
+    {
+        return rtrim((string) config('telkomsel.gateway_url', ''), '/');
     }
 
     /**

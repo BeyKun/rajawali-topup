@@ -38,6 +38,12 @@ class ProcessVoucherRedeemJob implements ShouldQueue
     /** Maximum number of redeem attempts before the order is marked FAILED. */
     public int $tries = 3;
 
+    /**
+     * Seconds a single attempt may block while the gateway waits for its
+     * three-per-minute quota or solves a captcha.
+     */
+    public int $timeout = 300;
+
     public function __construct(public Order $order) {}
 
     /**
