@@ -58,7 +58,7 @@ RUN npm run build
 # ==============================================================================
 # Stage 3: Production Runtime (PHP 8.4-FPM + Nginx)
 # ==============================================================================
-FROM php:8.4.27-fpm-alpine AS production
+FROM php:8.4.28-fpm-alpine AS production
 
 LABEL maintainer="Rajawali Topup"
 
@@ -97,16 +97,16 @@ RUN apk add --no-cache --virtual .build-deps \
     linux-headers \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) \
-        pdo_pgsql \
-        pgsql \
-        pdo_mysql \
-        gd \
-        zip \
-        intl \
-        bcmath \
-        exif \
-        pcntl \
-        opcache \
+    pdo_pgsql \
+    pgsql \
+    pdo_mysql \
+    gd \
+    zip \
+    intl \
+    bcmath \
+    exif \
+    pcntl \
+    opcache \
     && pecl install redis \
     && docker-php-ext-enable redis \
     && apk del .build-deps \
@@ -142,12 +142,12 @@ COPY --chown=www-data:www-data --from=frontend-builder /app/public/build /var/ww
 
 # Ensure storage and bootstrap directories exist with proper permissions
 RUN mkdir -p /var/www/html/storage/app/public \
-             /var/www/html/storage/app/private \
-             /var/www/html/storage/framework/cache/data \
-             /var/www/html/storage/framework/sessions \
-             /var/www/html/storage/framework/views \
-             /var/www/html/storage/logs \
-             /var/www/html/bootstrap/cache \
+    /var/www/html/storage/app/private \
+    /var/www/html/storage/framework/cache/data \
+    /var/www/html/storage/framework/sessions \
+    /var/www/html/storage/framework/views \
+    /var/www/html/storage/logs \
+    /var/www/html/bootstrap/cache \
     && rm -f /var/www/html/bootstrap/cache/*.php \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache \
     && rm -rf /var/www/html/docker
